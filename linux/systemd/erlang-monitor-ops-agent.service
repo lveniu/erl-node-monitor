@@ -11,7 +11,7 @@ WorkingDirectory=/data/node_monitor
 UMask=0027
 Environment=SSH_AUTH_SOCK=/run/erlang-monitor-ssh-agent/agent.sock
 Environment=OPS_AGENT_MODEL_API_KEY_FILE=/data/node_monitor/secrets/glm_api_key
-Environment=OPS_AGENT_TOOL_API_TOKEN_FILE=/data/node_monitor/secrets/holmes_tool_api_token
+Environment=OPS_AGENT_TOOL_API_TOKEN_FILE=/data/node_monitor/secrets/ops_agent_tool_api_token
 ExecStartPre=/usr/bin/test -S /run/erlang-monitor-ssh-agent/agent.sock
 ExecStartPre=/usr/bin/ssh-add -l
 ExecStartPre=/opt/erlang-monitor/bin/ops-agent -config /data/node_monitor/ops-agent/config.native.yml -servers /data/node_monitor/config/servers.native.yml -check-config

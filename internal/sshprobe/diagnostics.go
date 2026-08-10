@@ -312,8 +312,8 @@ func runDiagnosticRPC(ctx context.Context, client *ssh.Client, server config.Ser
 }
 
 func runDiagnosticRPCWithConsole(ctx context.Context, client *ssh.Client, server config.Server, process beamProcess, expression string) (string, string, error) {
-	helperName := fmt.Sprintf("holmes_%d_%d@127.0.0.1", process.PID, time.Now().UnixNano())
-	wrapper := fmt.Sprintf("Target=list_to_atom(%s),{ok,Tokens,_}=erl_scan:string(%s++\".\"),{ok,Forms}=erl_parse:parse_exprs(Tokens),case rpc:call(Target,erl_eval,exprs,[Forms,[]],%d) of {badrpc,Reason}->io:format(\"HOLMES_ERROR:~p~n\",[Reason]),halt(2);{value,Value,_}->io:format(\"HOLMES_RESULT:~P~n\",[Value,20]),halt(0);Other->io:format(\"HOLMES_ERROR:~p~n\",[Other]),halt(3) end.", strconv.Quote(process.NodeName), strconv.Quote(expression), server.CommandTimeout.Duration.Milliseconds())
+	helperName := fmt.Sprintf("monitor_diag_%d_%d@127.0.0.1", process.PID, time.Now().UnixNano())
+	wrapper := fmt.Sprintf("Target=list_to_atom(%s),{ok,Tokens,_}=erl_scan:string(%s++\".\"),{ok,Forms}=erl_parse:parse_exprs(Tokens),case rpc:call(Target,erl_eval,exprs,[Forms,[]],%d) of {badrpc,Reason}->io:format(\"DIAGNOSTIC_ERROR:~p~n\",[Reason]),halt(2);{value,Value,_}->io:format(\"DIAGNOSTIC_RESULT:~P~n\",[Value,20]),halt(0);Other->io:format(\"DIAGNOSTIC_ERROR:~p~n\",[Other]),halt(3) end.", strconv.Quote(process.NodeName), strconv.Quote(expression), server.CommandTimeout.Duration.Milliseconds())
 	command := strings.Join([]string{
 		shellQuote(process.ErlBinary), "-name", shellQuote(helperName), "-noinput",
 		"-setcookie", shellQuote(process.Cookie), "-hidden",
@@ -324,7 +324,7 @@ func runDiagnosticRPCWithConsole(ctx context.Context, client *ssh.Client, server
 	if err != nil {
 		return "", "", err
 	}
-	marker := "HOLMES_RESULT:"
+	marker := "DIAGNOSTIC_RESULT:"
 	index := strings.Index(output, marker)
 	if index < 0 {
 		return "", "", fmt.Errorf("RPC returned no bounded result: %s", truncate(output, 800))

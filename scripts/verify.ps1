@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$Toolchain = "go1.22.12"
 )
 
@@ -27,27 +27,15 @@ try {
     New-Item -ItemType Directory -Force bin | Out-Null
     go build -trimpath -o bin/erlang-exporter.exe ./cmd/erlang-exporter
     if ($LASTEXITCODE -ne 0) { throw "erlang-exporter build failed" }
-    go build -trimpath -o bin/holmes-gateway.exe ./cmd/holmes-gateway
-    if ($LASTEXITCODE -ne 0) { throw "holmes-gateway build failed" }
-    go build -trimpath -o bin/holmes-diagnostic-smoke.exe ./cmd/holmes-diagnostic-smoke
-    if ($LASTEXITCODE -ne 0) { throw "holmes-diagnostic-smoke build failed" }
     $env:GOOS = "linux"
     $env:GOARCH = "amd64"
     $env:CGO_ENABLED = "0"
     go build -trimpath -o bin/erlang-exporter-linux-amd64 ./cmd/erlang-exporter
     if ($LASTEXITCODE -ne 0) { throw "Linux erlang-exporter build failed" }
-    go build -trimpath -o bin/holmes-gateway-linux-amd64 ./cmd/holmes-gateway
-    if ($LASTEXITCODE -ne 0) { throw "Linux holmes-gateway build failed" }
     Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
 
     & ./bin/erlang-exporter.exe -config config/servers.example.yml -check-config
     if ($LASTEXITCODE -ne 0) { throw "example server config validation failed" }
-    & ./bin/holmes-gateway.exe -config holmes/gateway.example.yml -servers config/servers.example.yml -check-config
-    if ($LASTEXITCODE -ne 0) { throw "local Holmes gateway config validation failed" }
-    & ./bin/holmes-gateway.exe -config holmes/gateway.container.yml -servers config/servers.example.yml -check-config
-    if ($LASTEXITCODE -ne 0) { throw "container Holmes gateway config validation failed" }
-    & ./bin/holmes-gateway.exe -config holmes/gateway.native.yml -servers config/servers.native.yml -check-config
-    if ($LASTEXITCODE -ne 0) { throw "native Holmes gateway config validation failed" }
 
     $launcherParseFailed = $false
     Get-ChildItem scripts -Filter "start-*.ps1" -Recurse | ForEach-Object {
@@ -77,13 +65,11 @@ try {
     $localDatasourceCount = [regex]::Matches($localDatasourceText, '(?m)^\s*-\s+name:\s*').Count
     if ($localDatasourceCount -ne 1 -or -not $localDatasourceText.Contains('uid: prometheus')) { throw "Prometheus must be the only active local datasource" }
     if (-not ($pluginConfig.includes | Where-Object { $_.path -eq "/a/erlang-monitor-controls-app/overview" -and $_.role -eq "Viewer" })) { throw "Grafana overview Viewer page is missing" }
-    if ($pluginConfig.includes | Where-Object { $_.path -eq "/a/erlang-monitor-controls-app/holmes" }) { throw "Grafana Holmes page must remain hidden" }
-    if ($pluginConfig.routes | Where-Object { $_.path -in @("holmes-health", "holmes", "holmes-admin") }) { throw "Grafana Holmes proxy routes must remain disabled" }
     $composeText = Get-Content -Raw -Encoding UTF8 compose.yml
     $localLauncherText = Get-Content -Raw -Encoding UTF8 scripts/start-local-monitor.ps1
     $nativeGrafanaConfigText = Get-Content -Raw -Encoding UTF8 grafana/grafana.local.ini
     if (-not $composeText.Contains('GF_DATAPROXY_SEND_USER_HEADER: "true"') -or -not $nativeGrafanaConfigText.Contains('send_user_header = true')) {
-        throw "Grafana must forward the authenticated username to the Holmes gateway"
+        throw "Grafana must forward the authenticated username to backend plugin proxies"
     }
     if (-not $composeText.Contains('GF_PLUGINS_PREINSTALL_DISABLED: "true"') -or -not $nativeGrafanaConfigText.Contains('preinstall_disabled = true')) {
         throw "Grafana automatic plugin preinstallation must remain disabled"
@@ -117,42 +103,6 @@ try {
         throw "Shared server config must select the external SSH Agent identity by project-relative public-key path"
     }
 
-    $modelListText = Get-Content -Raw -Encoding UTF8 holmes/model_list.example.yaml
-    if ($modelListText -match '(?im)^\s*temperature\s*:') { throw "Kimi model example must not set temperature" }
-    if (-not $modelListText.Contains('{{ env.GLM_API_KEY }}') -or -not $modelListText.Contains('{{ env.KIMI_API_KEY }}')) { throw "Model example must use environment placeholders" }
-	$holmesLauncherText = Get-Content -Raw -Encoding UTF8 scripts/start-holmes-local.ps1
-	if (-not $holmesLauncherText.Contains('$leaveRunning = $true') -or -not $holmesLauncherText.Contains('if (-not $leaveRunning)')) { throw "Holmes -NoWait mode would not preserve background processes" }
-	if (-not $holmesLauncherText.Contains('PYTHONUTF8 = "1"') -or -not $holmesLauncherText.Contains('PYTHONIOENCODING = "utf-8"')) { throw "Holmes Windows launcher must force UTF-8 for Chinese Skills and prompts" }
-	if (-not $holmesLauncherText.Contains('HOLMES_CONFIGPATH_DIR = $holmesConfigDir') -or -not $holmesLauncherText.Contains('$holmesRuntimeConfig = Join-Path $holmesConfigDir "config.yaml"')) { throw "Holmes Windows launcher must stage HOLMES_CONFIGPATH_DIR/config.yaml" }
-
-    $nativeHolmesFiles = @(
-        "holmes/native/config.yaml",
-        "holmes/gateway.native.yml",
-        "holmes/model_list.native.example.yaml",
-        "holmes/native-overrides/README.md",
-        "holmes/native-overrides/holmes-0.38.1-centos7.patch",
-        "linux/holmes-native-requirements.txt",
-        "linux/install-holmes-runtime.sh",
-        "linux/install-holmes-services.sh",
-        "linux/configure-holmes-grafana.sh",
-        "linux/run-holmes.sh",
-        "linux/run-holmes-gateway.sh",
-        "linux/validate-holmes-config.sh",
-        "linux/holmes-health-check.sh",
-        "linux/update-holmes-and-restart.sh",
-        "linux/systemd/erlang-monitor-holmes.service",
-        "linux/systemd/erlang-monitor-holmes-gateway.service",
-        "linux/bin/holmes-gateway",
-        "linux/packages/cpython-3.11.15+20260804-x86_64-unknown-linux-gnu-install_only_stripped.tgz",
-        "linux/packages/holmesgpt-0.38.1-native-centos7.tgz",
-        "linux/packages/holmes-wheels-0.38.1-centos7-x86_64.tgz"
-    )
-    foreach ($nativeHolmesFile in $nativeHolmesFiles) {
-        if (-not (Test-Path -LiteralPath $nativeHolmesFile -PathType Leaf) -or (Get-Item -LiteralPath $nativeHolmesFile).Length -eq 0) {
-            throw "Missing or empty native Holmes release file: $nativeHolmesFile"
-        }
-    }
-
     $checksumLines = @(Get-Content -LiteralPath linux/checksums.sha256 -Encoding ASCII | Where-Object { $_.Trim() })
     foreach ($checksumLine in $checksumLines) {
         if ($checksumLine -notmatch '^([0-9a-f]{64})  (.+)$') { throw "Malformed checksum manifest line: $checksumLine" }
@@ -162,21 +112,19 @@ try {
         $actualHash = (Get-FileHash -LiteralPath $artifactPath -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actualHash -ne $expectedHash) { throw "Checksum mismatch: $artifactPath" }
     }
-    foreach ($checksummedNativeArtifact in @(
-        "packages/cpython-3.11.15+20260804-x86_64-unknown-linux-gnu-install_only_stripped.tgz",
-        "packages/holmesgpt-0.38.1-native-centos7.tgz",
-        "packages/holmes-wheels-0.38.1-centos7-x86_64.tgz",
-        "bin/holmes-gateway"
+    foreach ($requiredArtifact in @(
+        "packages/prometheus-3.5.0.linux-amd64.tar.gz",
+        "packages/alertmanager-0.28.1.linux-amd64.tar.gz",
+        "packages/grafana-12.1.0.linux-amd64.tar.gz",
+        "bin/erlang-exporter",
+        "bin/ops-agent"
     )) {
-        if (-not ($checksumLines | Where-Object { $_.EndsWith("  $checksummedNativeArtifact") })) {
-            throw "Native Holmes artifact is absent from linux/checksums.sha256: $checksummedNativeArtifact"
+        if (-not ($checksumLines | Where-Object { $_.EndsWith("  $requiredArtifact") })) {
+            throw "Required Linux artifact is absent from linux/checksums.sha256: $requiredArtifact"
         }
     }
 
     $baseRuntimeInstallerText = Get-Content -Raw -Encoding UTF8 linux/install-runtime.sh
-    if ($baseRuntimeInstallerText.Contains("grep '  packages/'")) {
-        throw "Base runtime installer must not validate Holmes packages from the base package root"
-    }
     foreach ($baseRuntimeArchive in @(
         'packages/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz',
         'packages/alertmanager-${ALERTMANAGER_VERSION}.linux-amd64.tar.gz',
@@ -187,55 +135,18 @@ try {
         }
     }
 
-    $nativeRequirementsText = Get-Content -Raw -Encoding UTF8 linux/holmes-native-requirements.txt
-    foreach ($requiredPin in @('jq==1.10.0', 'tiktoken==0.11.0')) {
-        if (-not $nativeRequirementsText.Contains($requiredPin)) { throw "Native Holmes compatibility pin is missing: $requiredPin" }
-    }
-    $nativeDeploymentText = @(
-        Get-Content -Raw -Encoding UTF8 linux/install-holmes-runtime.sh
-        Get-Content -Raw -Encoding UTF8 linux/install-holmes-services.sh
-        Get-Content -Raw -Encoding UTF8 linux/configure-holmes-grafana.sh
-        Get-Content -Raw -Encoding UTF8 linux/run-holmes.sh
-        Get-Content -Raw -Encoding UTF8 linux/run-holmes-gateway.sh
-        Get-Content -Raw -Encoding UTF8 linux/update-holmes-and-restart.sh
-        Get-Content -Raw -Encoding UTF8 linux/systemd/erlang-monitor-holmes.service
-        Get-Content -Raw -Encoding UTF8 linux/systemd/erlang-monitor-holmes-gateway.service
-    ) -join "`n"
-    if ($nativeDeploymentText -match '(?i)\b(?:docker|compose)\b') { throw "Native Holmes deployment must not depend on Docker or Compose" }
-    if ($nativeDeploymentText.Contains('127.0.0.1:5050')) { throw "Native Holmes deployment still references the obsolete 5050 port" }
-    foreach ($nativePort in @('127.0.0.1:20904', '127.0.0.1:20905')) {
-        if (-not $nativeDeploymentText.Contains($nativePort)) { throw "Native Holmes deployment is missing loopback endpoint: $nativePort" }
-    }
-    $baseServiceInstallerText = Get-Content -Raw -Encoding UTF8 linux/install-services.sh
-    if ($baseServiceInstallerText.Contains('erlang-monitor-holmes')) { throw "Optional Holmes units must not be installed by the base four-service installer" }
-    $nativeUpdateText = Get-Content -Raw -Encoding UTF8 linux/update-holmes-and-restart.sh
-    foreach ($requiredSafetyMarker in @('--revision', 'Only Holmes and Holmes Gateway were restarted', 'Existing monitoring service changed state')) {
-        if (-not $nativeUpdateText.Contains($requiredSafetyMarker)) { throw "Native Holmes deployment safety marker is missing: $requiredSafetyMarker" }
-    }
-    $grafanaHolmesConfigText = Get-Content -Raw -Encoding UTF8 linux/configure-holmes-grafana.sh
-    foreach ($requiredGrafanaMarker in @('secureJsonData', 'secureJsonFields', '/api/plugin-proxy/', 'Grafana was not restarted')) {
-        if (-not $grafanaHolmesConfigText.Contains($requiredGrafanaMarker)) { throw "Live Grafana Holmes configuration marker is missing: $requiredGrafanaMarker" }
-    }
     $nativeGrafanaLauncherText = Get-Content -Raw -Encoding UTF8 linux/run-grafana.sh
-    if (-not $nativeGrafanaLauncherText.Contains('HOLMES_TOOL_TOKEN_FILE') -or -not $nativeGrafanaLauncherText.Contains('export HOLMES_TOOL_API_TOKEN')) {
-        throw "Native Grafana launcher must preserve the Holmes proxy Secret across a later restart"
+    if (-not $nativeGrafanaLauncherText.Contains('OPS_AGENT_TOOL_TOKEN_FILE') -or -not $nativeGrafanaLauncherText.Contains('export OPS_AGENT_TOOL_API_TOKEN')) {
+        throw "Native Grafana launcher must inject the Ops Agent proxy token"
     }
-    $nativeGatewayUnitText = Get-Content -Raw -Encoding UTF8 linux/systemd/erlang-monitor-holmes-gateway.service
-    foreach ($requiredAgentMarker in @('SSH_AUTH_SOCK=/run/erlang-monitor-ssh-agent/agent.sock', '/usr/bin/test -S /run/erlang-monitor-ssh-agent/agent.sock', '/usr/bin/ssh-add -l')) {
-        if (-not $nativeGatewayUnitText.Contains($requiredAgentMarker)) { throw "Native Holmes Gateway must use the dedicated SSH Agent: $requiredAgentMarker" }
+    $nativeOpsUnitText = Get-Content -Raw -Encoding UTF8 linux/systemd/erlang-monitor-ops-agent.service
+    if (-not $nativeOpsUnitText.Contains('secrets/ops_agent_tool_api_token')) {
+        throw "Native Ops Agent unit must use its dedicated proxy token"
     }
-	$realSmokeText = Get-Content -Raw -Encoding UTF8 scripts/smoke-real-models.ps1
-	foreach ($requiredSmokeMarker in @('Prometheus-then-controlled-diagnostic sequence', 'approval_required', 'HOLMES_TIMEOUT', 'MODEL_RATE_LIMITED')) {
-		if (-not $realSmokeText.Contains($requiredSmokeMarker)) { throw "Real model smoke coverage is missing marker: $requiredSmokeMarker" }
-	}
-    $skillText = Get-Content -Raw -Encoding UTF8 holmes/skills/erlang-external-rca/SKILL.md
-    if (-not $skillText.Contains('不调用会触发钉钉通知') -or -not $skillText.Contains('BEAM 进程数不是')) { throw "Project RCA skill safety rules are incomplete" }
+
     $ruleText = Get-Content -Raw -Encoding UTF8 prometheus/rules/erlang-alerts.yml
     $alertNames = [regex]::Matches($ruleText, '(?m)^\s+- alert:\s*([A-Za-z0-9_]+)\s*$') | ForEach-Object { $_.Groups[1].Value }
     if (@($alertNames).Count -ne 16) { throw "Expected 16 authoritative Erlang alert rules, found $(@($alertNames).Count)" }
-    $missingSkillAlerts = @($alertNames | Where-Object { -not $skillText.Contains("``$_``") })
-    if ($missingSkillAlerts.Count -gt 0) { throw "Project RCA skill is missing alert branches: $($missingSkillAlerts -join ', ')" }
-
     $secretPattern = '(?i)sk-[a-z0-9_-]{24,}|Bearer\s+[a-z0-9._-]{32,}'
     $secretLeak = & rg -n --no-messages --glob "*.go" --glob "*.js" --glob "*.json" --glob "*.yml" --glob "*.yaml" --glob "*.ps1" --glob "*.md" --glob "!secrets/**" --glob "!.runtime/**" --glob "!data/**" --glob "!bin/**" --glob "!logs/**" --glob "!grafana/plugins/grafana-*/**" $secretPattern
     if (@($secretLeak).Count -gt 0) { throw "Potential API key material found outside ignored secret directories." }

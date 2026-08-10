@@ -20,7 +20,6 @@ $opsAgentConfig = Join-Path $projectRoot "ops-agent\config.local.yml"
 $opsAgentModelKeyFile = Join-Path $secretRoot "ops_agent_model_api_key"
 $opsAgentToolTokenFile = Join-Path $secretRoot "ops_agent_tool_api_token"
 $glmKeyFile = Join-Path $secretRoot "glm_api_key"
-$holmesToolTokenFile = Join-Path $secretRoot "holmes_tool_api_token"
 $prometheusExe = Join-Path $runtimeRoot "prometheus-3.5.0\prometheus.exe"
 $promtoolExe = Join-Path $runtimeRoot "prometheus-3.5.0\promtool.exe"
 $alertmanagerExe = Join-Path $runtimeRoot "alertmanager-0.28.1\alertmanager.exe"
@@ -339,10 +338,6 @@ try {
     if (Test-Path -LiteralPath $opsAgentToolTokenFile -PathType Leaf) {
         $opsAgentTokenPath = $opsAgentToolTokenFile
     }
-    elseif (Test-Path -LiteralPath $holmesToolTokenFile -PathType Leaf) {
-        $opsAgentTokenPath = $holmesToolTokenFile
-        Write-Warning "Ops Agent is using secrets\holmes_tool_api_token as its tool token fallback; create secrets\ops_agent_tool_api_token to make this explicit."
-    }
     if ((Test-Path -LiteralPath $opsAgentExe -PathType Leaf) -and (Test-Path -LiteralPath $opsAgentConfig -PathType Leaf) -and $opsAgentTokenPath) {
         if (Test-Path -LiteralPath $opsAgentModelKeyFile -PathType Leaf) {
             $opsAgentKeyPath = $opsAgentModelKeyFile
@@ -433,15 +428,11 @@ try {
             "ERLANG_MONITOR_QT05_INTERNAL_DASHBOARDS_PATH" = $grafanaQt05InternalDashboards.Replace('\', '/')
             "ERLANG_MONITOR_QT07_INTERNAL_DASHBOARDS_PATH" = $grafanaQt07InternalDashboards.Replace('\', '/')
         }
-        if (Test-Path -LiteralPath $holmesToolTokenFile -PathType Leaf) {
-            $grafanaEnvironment["HOLMES_TOOL_API_TOKEN"] = (Get-Content -Raw -LiteralPath $holmesToolTokenFile).Trim()
-        }
         if ($opsAgentEnabled) {
             $grafanaEnvironment["OPS_AGENT_TOOL_API_TOKEN"] = (Get-Content -Raw -LiteralPath $opsAgentTokenPath).Trim()
         }
         $grafanaProcess = Start-ManagedProcess -Name "grafana" -FilePath $grafanaExe -ArgumentList @("server", "--homepath=`"$grafanaHome`"", "--config=`"$grafanaConfig`"") -WorkingDirectory $grafanaHome -Environment $grafanaEnvironment
         $grafanaEnvironment["GF_SECURITY_ADMIN_PASSWORD"] = $null
-        $grafanaEnvironment["HOLMES_TOOL_API_TOKEN"] = $null
         $grafanaEnvironment["OPS_AGENT_TOOL_API_TOKEN"] = $null
         Wait-HttpReady -Name "Grafana" -Uri "http://127.0.0.1:20900/api/health" -TimeoutSeconds 90 -Process $grafanaProcess
     }

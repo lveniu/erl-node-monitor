@@ -30,6 +30,6 @@ test -s "${PROJECT_ROOT}/grafana/grafana.local.ini"
 test -d "${PROJECT_ROOT}/grafana/provisioning-local"
 test -d "${PROJECT_ROOT}/grafana/plugins/erlang-monitor-controls-app"
 test -s "${PROJECT_ROOT}/secrets/glm_api_key"
-test -s "${PROJECT_ROOT}/secrets/holmes_tool_api_token"
+test -s "${PROJECT_ROOT}/secrets/ops_agent_tool_api_token"
 
 echo "Native Linux monitoring configuration is valid."

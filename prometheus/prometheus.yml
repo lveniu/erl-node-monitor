@@ -20,8 +20,3 @@ scrape_configs:
   - job_name: erlang-exporter
     static_configs:
       - targets: [erlang-exporter:20903]
-
-  - job_name: holmes-gateway
-    scrape_interval: 30s
-    static_configs:
-      - targets: [holmes-gateway:20904]

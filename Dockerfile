@@ -7,7 +7,6 @@ COPY internal ./internal
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/erlang-exporter ./cmd/erlang-exporter
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/holmes-gateway ./cmd/holmes-gateway
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/ops-agent ./cmd/ops-agent
 
 FROM alpine:3.20 AS exporter
@@ -15,12 +14,6 @@ RUN apk add --no-cache ca-certificates tzdata && mkdir -p /var/lib/erlang-monito
 COPY --from=build /out/erlang-exporter /usr/local/bin/erlang-exporter
 USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/erlang-exporter"]
-
-FROM alpine:3.20 AS gateway
-RUN apk add --no-cache ca-certificates tzdata && mkdir -p /var/lib/erlang-monitor/holmes && chown -R 65532:65532 /var/lib/erlang-monitor
-COPY --from=build /out/holmes-gateway /usr/local/bin/holmes-gateway
-USER 65532:65532
-ENTRYPOINT ["/usr/local/bin/holmes-gateway"]
 
 FROM alpine:3.20 AS ops-agent
 RUN apk add --no-cache ca-certificates tzdata

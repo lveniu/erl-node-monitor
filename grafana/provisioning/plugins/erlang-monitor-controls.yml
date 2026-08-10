@@ -6,8 +6,6 @@ apps:
     disabled: false
     jsonData:
       collectorUrl: http://erlang-exporter:20903
-      holmesGatewayUrl: http://holmes-gateway:20904
       opsAgentUrl: http://erlang-ops-agent:20906
     secureJsonData:
-      holmesToolToken: $HOLMES_TOOL_API_TOKEN
       opsAgentToolToken: $OPS_AGENT_TOOL_API_TOKEN

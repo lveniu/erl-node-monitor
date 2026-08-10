@@ -27,74 +27,6 @@ services:
       timeout: 5s
       retries: 3
 
-  holmes:
-    profiles: ["holmes"]
-    image: robustadev/holmes:0.38.1@sha256:a9350bb400df457853a0acb67f63cb57fbfbfd697eccdf9330be4e0b20375944
-    restart: unless-stopped
-    entrypoint:
-      - /bin/sh
-      - -c
-      - >-
-        export HOLMES_API_KEY="$$(cat /run/secrets/holmes_api_key)";
-        export GLM_API_KEY="$$(cat /run/secrets/glm_api_key)";
-        export KIMI_API_KEY="$$(cat /run/secrets/kimi_api_key)";
-        exec python -u server.py
-    environment:
-      HOLMES_CONFIG_PATH: /etc/holmes/project/config.yml
-      MODEL_LIST_FILE_LOCATION: /etc/holmes/project/model_list.yaml
-      HOLMES_HOST: "0.0.0.0"
-      HOLMES_PORT: "20905"
-      HOLMES_TOOL_RESULT_STORAGE_ENABLED: "false"
-      ENABLE_JSON_LOGS_FORMAT: "true"
-      TZ: Asia/Shanghai
-    volumes:
-      - ./holmes/config.container.yml:/etc/holmes/project/config.yml:ro
-      - ./holmes/model_list.local.yaml:/etc/holmes/project/model_list.yaml:ro
-      - ./holmes/skills:/etc/holmes/project-skills:ro
-    secrets:
-      - holmes_api_key
-      - glm_api_key
-      - kimi_api_key
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:20905/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-
-  holmes-gateway:
-    profiles: ["holmes"]
-    build:
-      context: .
-      target: gateway
-    restart: unless-stopped
-    command: ["-config", "/etc/erlang-monitor/holmes-gateway.yml", "-servers", "/etc/erlang-monitor/servers.yml", "-listen", "0.0.0.0:20904", "-data-dir", "/var/lib/erlang-monitor/holmes"]
-    environment:
-      HOLMES_API_KEY_FILE: /run/secrets/holmes_api_key
-      HOLMES_TOOL_API_TOKEN_FILE: /run/secrets/holmes_tool_api_token
-      TZ: Asia/Shanghai
-    volumes:
-      - ./holmes/gateway.container.yml:/etc/erlang-monitor/holmes-gateway.yml:ro
-      - ./config/servers.yml:/etc/erlang-monitor/servers.yml:ro
-      - holmes-gateway-data:/var/lib/erlang-monitor/holmes
-    secrets:
-      - holmes_api_key
-      - holmes_tool_api_token
-      - monitor_private_key
-      - monitor_private_key_passphrase
-    ports:
-      - "${MONITOR_BIND_IP:-127.0.0.1}:20904:20904"
-    depends_on:
-      holmes:
-        condition: service_started
-      prometheus:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:20904/healthz"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
   prometheus:
     image: prom/prometheus:v3.5.0
     restart: unless-stopped
@@ -170,18 +102,8 @@ secrets:
     file: ./secrets/dingtalk_secret
   grafana_admin_password:
     file: ./secrets/grafana_admin_password
-  holmes_api_key:
-    file: ./secrets/holmes_api_key
-  holmes_tool_api_token:
-    file: ./secrets/holmes_tool_api_token
-  glm_api_key:
-    file: ./secrets/glm_api_key
-  kimi_api_key:
-    file: ./secrets/kimi_api_key
-
 volumes:
   exporter-data:
   prometheus-data:
   alertmanager-data:
   grafana-data:
-  holmes-gateway-data:

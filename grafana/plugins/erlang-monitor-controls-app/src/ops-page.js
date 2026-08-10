@@ -1,8 +1,8 @@
 import { getBackendSrv } from '@grafana/runtime';
 import React from 'react';
 
-import { safeMarkdownText } from './holmes-logic.js';
 import { preferredServer, serverOptions, skillSummaries, withTaskID } from './ops-logic.js';
+import { safeMarkdownText } from './shared-logic.js';
 
 const h = React.createElement;
 const opsProxyURL = '/api/plugin-proxy/erlang-monitor-controls-app/ops-agent';

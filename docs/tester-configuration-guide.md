@@ -2,9 +2,9 @@
 
 ## 1. 阅读目标
 
-本文面向监控平台测试人员。阅读后应能够找到监控功能配置，安全准备测试数据，并分别验证服务器采集、Prometheus、告警、钉钉、Grafana 和可选 HolmesGPT。Windows 运行环境和部署配置不在本文范围内。
+本文面向监控平台测试人员。阅读后应能够找到监控功能配置，安全准备测试数据，并分别验证服务器采集、Prometheus、告警、钉钉、Grafana 和 Ops Agent。Windows 运行环境和部署配置不在本文范围内。
 
-本文记录的是 2026-08-04 仓库状态。真实服务器、钉钉机器人和模型账号可能变化，执行测试时应重新确认。
+本文记录的是 2026-08-10 仓库状态。真实服务器、钉钉机器人和模型账号可能变化，执行测试时应重新确认。
 
 ## 2. 测试安全边界
 
@@ -13,7 +13,7 @@
 - `secrets/` 下除说明文件外均为本地 Secret；只能检查文件是否存在、是否为空，不能打印内容。
 - 生产配置必须使用已核验的 `host_key_sha256` 或 `known_hosts_file`。`insecure_skip_host_key: true` 只允许临时测试。
 - 测试钉钉前先确认机器人安全关键字或 HMAC，避免向错误群发送消息。
-- Holmes 的 Admin 诊断必须经过单次审批；不得绕过审批或扩大允许命令范围。
+- Ops Agent 的管理操作必须经过单次审批；不得绕过审批或扩大允许命令范围。
 
 ## 3. 配置总览
 
@@ -27,15 +27,13 @@
 | `alertmanager/alertmanager.local.yml` / `alertmanager.yml` | 告警分组与钉钉路由 | 否 |
 | `grafana/provisioning-local/` / `provisioning/` | 数据源、目录和插件接入 | Token 从环境或 Secret 读取 |
 | `grafana/dashboards*/` | 9 台服务器的预置页面 | 否 |
-| `holmes/config.*.yml` | Holmes 工具集和隔离策略 | 否 |
-| `holmes/gateway.*.yml` | Holmes 网关、模型别名和限制 | 否 |
-| `holmes/model_list.local.yaml` | 实际模型 ID 与环境变量引用 | 不直接写 Key |
+| `ops-agent/config.*.yml` | Ops Agent 模型、工具和任务限制 | 不直接写 Key |
 | `secrets/*` | 密钥、Token、密码和接收人 | 是，禁止提交 |
 
 ```text
 服务器配置 ──> Exporter ──> Prometheus ──> 告警规则 ──> Alertmanager ──> Exporter钉钉适配 ──> 钉钉
                        └──────────────> Grafana 仪表盘与插件
-Prometheus + 服务器配置 ──> Holmes Gateway ──> HolmesGPT ──> GLM/Kimi
+服务器配置 + 受控技能 ──> Ops Agent ──> 模型 API
 ```
 
 ## 4. 服务器与采集配置
@@ -148,15 +146,14 @@ alert_filters:
 | `dingtalk_at_user_ids` | 用户 ID 列表，逗号/分号/换行分隔 |
 | `grafana_admin_password` | Grafana 管理员密码 |
 | `ssh/qt_identity` | 当前本地 4 台内网服务器的 SSH 私钥 |
-| `holmes_api_key` | 网关调用 Holmes 的独立 Key |
-| `holmes_tool_api_token` | Grafana 后端代理调用网关的 Token |
-| `glm_api_key` / `kimi_api_key` | 模型账号 Key |
+| `ops_agent_model_api_key` | Ops Agent 模型账号 Key |
+| `ops_agent_tool_api_token` | Grafana 后端代理调用 Ops Agent 的 Token |
 
 两个接收人文件都不存在时，告警仍发送但不 @ 人，禁止测试人员猜测接收人。server ID 匹配 `qt[0-9]+-internal-.*` 时，Alertmanager 路由到 `mention=false`，同样发送但不 @ 人。
 
 ## 6. Prometheus、告警与钉钉
 
-两套 Prometheus 配置的监控语义一致：抓取和规则计算 1m，Holmes Gateway 抓取 30s，数据保留 30d。
+两套 Prometheus 配置的监控语义一致：抓取和规则计算 1m，数据保留 30d。
 
 告警中的“等待”是 Prometheus 条件持续成立的时间，不包含 Exporter 自己的复核时间。例如节点失败会先等待 3 分钟做一次定向复核，复核后指标仍为失败，Prometheus 再按规则确认。因此从第一次异常到钉钉通知，实际时间可能比表中等待时间更长。
 
@@ -218,33 +215,11 @@ Alertmanager 按 `alertname/severity/server/node` 分组，首次等待 15s、�
 
 新增 server 不会自动生成仪表盘。必须同时确认对应 Dashboard JSON 已提供、标题正确、`server` 变量固定到对应 `name`，并加入正确目录/标签。
 
-插件读取 Exporter、Holmes Gateway 地址和只从 Secret/环境注入的 `HOLMES_TOOL_API_TOKEN`。Dashboard 自动查询刷新固定为 30m；页面 `Refresh` 会触发当前服务器异步采集，等待采集和 Prometheus 下一次抓取后刷新。按钮置灰 10s 只是前端防连点。
+插件读取 Exporter、Ops Agent 地址和只从 Secret/环境注入的 `OPS_AGENT_TOOL_API_TOKEN`。Dashboard 自动查询刷新固定为 30m；页面 `Refresh` 会触发当前服务器异步采集，等待采集和 Prometheus 下一次抓取后刷新。按钮置灰 10s 只是前端防连点。
 
-## 8. HolmesGPT 可选配置
+## 8. 核心测试场景
 
-基础监控不依赖 Holmes。没有真实模型 Secret 时，不应声称 GLM/Kimi 已通过。
-
-`holmes/config.local.yml` 和 `config.container.yml` 配置 `max_steps: 20`，只启用只读 Prometheus 工具，禁用 bash、Kubernetes、internet，并加载项目专用 skill。
-
-复制 `holmes/model_list.example.yaml` 为 Git 忽略的 `holmes/model_list.local.yaml`，只替换账号当前可用模型 ID。API Key 必须继续使用 `{{ env.GLM_API_KEY }}` 和 `{{ env.KIMI_API_KEY }}`。
-
-| 网关限制 | 当前值 | 约束 |
-|---|---:|---|
-| `max_range` | 24h | 不得超过 24h |
-| `investigation_timeout` | 5m | 正数 |
-| `tool_timeout` | 45s | 不得超过 45s |
-| `max_tool_calls` | 12 | 1–50 |
-| `max_output_bytes` | 262144 | 32 KiB–4 MiB |
-| `max_sessions` | 100 | 1–10000 |
-| `session_retention` | 168h | 正数 |
-| `max_user_running` | 1 | 正数且不大于全局值 |
-| `max_global_running` | 2 | 正数 |
-
-真实冒烟使用 `scripts/smoke-real-models.ps1`，分别记录 GLM/Kimi 是否先获取 Prometheus 证据再调用受控诊断，并区分认证、限流、拒绝和超时。
-
-## 9. 核心测试场景
-
-### 9.1 配置加载与热更新
+### 8.1 配置加载与热更新
 
 1. 记录 `/config/status` 版本。
 2. 修改测试服务器的非敏感阈值并保存。
@@ -252,11 +227,11 @@ Alertmanager 按 `alertname/severity/server/node` 分组，首次等待 15s、�
 4. 临时写入 `confirm_attempts: 2`，确认配置被拒绝、`last_error` 明确、旧配置继续工作。
 5. 恢复正确配置并确认再次加载。
 
-### 9.2 SSH 分层记录
+### 8.2 SSH 分层记录
 
 必须分别记录 TCP 端口、SSH 握手、公钥认证、远端命令执行和 Erlang 只读采集。前一层成功不能代替后一层成功。
 
-### 9.3 调度控制
+### 8.3 调度控制
 
 ```powershell
 Invoke-RestMethod -Method Post http://127.0.0.1:20903/schedule `
@@ -269,7 +244,7 @@ Invoke-RestMethod -Method Post http://127.0.0.1:20903/schedule `
 
 `refresh` 停止自动触发但保留指标；手动采集不会恢复定时器；切回 `auto` 后等待完整周期。
 
-### 9.4 钉钉与页面
+### 8.4 钉钉与页面
 
 - 用测试机器人验证触发只发一次、恢复可发送且不 @ 人。
 - 普通外网 server 按配置 @ 人；`qt*-internal-*` 发送但不 @ 人。
@@ -279,9 +254,9 @@ Invoke-RestMethod -Method Post http://127.0.0.1:20903/schedule `
 - CPU 为单核 100% 口径；内存/磁盘以 M 显示并保留两位；网络以 KB/s 显示。
 - Refresh 只触发当前服务器；新增 server 没有对应 Dashboard 应判配置不完整。
 
-## 10. 验收层级
+## 9. 验收层级
 
-项目验证应覆盖配置解析、Go 测试、Exporter/Holmes 示例配置、Grafana JSON、插件测试和 Secret 泄漏模式。测试报告只记录实际执行并取得证据的项目。
+项目验证应覆盖配置解析、Go 测试、Exporter/Ops Agent 示例配置、Grafana JSON、插件测试和 Secret 泄漏模式。测试报告只记录实际执行并取得证据的项目。
 
 报告必须分层记录，不能合并成“全部通过”：
 
@@ -293,9 +268,9 @@ Invoke-RestMethod -Method Post http://127.0.0.1:20903/schedule `
 | 真实服务器 | 分层 SSH 与真实采集有当前证据 |
 | 告警链路 | Prometheus → Alertmanager → 钉钉触发/恢复有证据 |
 | 页面渲染 | 浏览器实际渲染、单位、筛选和刷新通过 |
-| Holmes | 真实 GLM/Kimi、受控工具和审批分别通过 |
+| Ops Agent | 模型调用、受控技能和审批分别通过 |
 
-## 11. 常见失败
+## 10. 常见失败
 
 | 现象 | 优先检查 |
 |---|---|
@@ -307,10 +282,10 @@ Invoke-RestMethod -Method Post http://127.0.0.1:20903/schedule `
 | Refresh 后仍是旧值 | 等待异步采集及下一次 1m 抓取，不要只按 F5 |
 | 告警有但钉钉无 | route、ignored_nodes、Webhook/HMAC、模块 health |
 | 钉钉无 @ | 接收人文件、内网 no-mention 规则 |
-| Holmes 不可用 | profile/进程、Secret、模型列表、20904 health |
-| 模型限流/超时 | 按明确错误码记录，不归因成基础监控故障 |
+| Ops Agent 不可用 | 进程、Secret、配置和 `20906/healthz` |
+| 模型限流/超时 | 按明确错误记录，不归因成基础监控故障 |
 
-## 12. 测试结果模板
+## 11. 测试结果模板
 
 ```text
 日期/人员：
@@ -324,8 +299,7 @@ Git提交或包版本：
 Prometheus与16条规则：
 Alertmanager与钉钉触发/恢复：
 Grafana 9个页面和单位：
-Holmes GLM：通过 / 失败 / 未配置
-Holmes Kimi：通过 / 失败 / 未配置
+Ops Agent：通过 / 失败 / 未配置
 临时配置及恢复情况：
 未验证项和原因：
 缺陷单链接：

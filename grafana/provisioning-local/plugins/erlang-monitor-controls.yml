@@ -6,8 +6,6 @@ apps:
     disabled: false
     jsonData:
       collectorUrl: http://127.0.0.1:20903
-      holmesGatewayUrl: http://127.0.0.1:20904
       opsAgentUrl: http://127.0.0.1:20906
     secureJsonData:
-      holmesToolToken: $HOLMES_TOOL_API_TOKEN
       opsAgentToolToken: $OPS_AGENT_TOOL_API_TOKEN

@@ -33,14 +33,7 @@ $grafanaEnvironment = @{
     "ERLANG_MONITOR_QT07_INTERNAL_DASHBOARDS_PATH" = (Join-Path $projectRoot "grafana\dashboards-qt07-internal").Replace('\', '/')
 }
 
-$holmesTokenFile = Join-Path $secretRoot "holmes_tool_api_token"
-if (Test-Path -LiteralPath $holmesTokenFile -PathType Leaf) {
-    $grafanaEnvironment["HOLMES_TOOL_API_TOKEN"] = (Get-Content -Raw -LiteralPath $holmesTokenFile).Trim()
-}
 $opsAgentTokenFile = Join-Path $secretRoot "ops_agent_tool_api_token"
-if (-not (Test-Path -LiteralPath $opsAgentTokenFile -PathType Leaf)) {
-    $opsAgentTokenFile = $holmesTokenFile
-}
 if (Test-Path -LiteralPath $opsAgentTokenFile -PathType Leaf) {
     $grafanaEnvironment["OPS_AGENT_TOOL_API_TOKEN"] = (Get-Content -Raw -LiteralPath $opsAgentTokenFile).Trim()
 }

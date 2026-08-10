@@ -45,7 +45,6 @@ func TestMonitoringPortsUseReserved20900Range(t *testing.T) {
 	files := []string{
 		filepath.Join(root, "compose.yml"),
 		filepath.Join(root, "scripts", "start-local-monitor.ps1"),
-		filepath.Join(root, "scripts", "start-holmes-local.ps1"),
 	}
 	combined := ""
 	for _, path := range files {
@@ -55,13 +54,15 @@ func TestMonitoringPortsUseReserved20900Range(t *testing.T) {
 		}
 		combined += string(data)
 	}
-	for _, port := range []string{"20900", "20901", "20902", "20903", "20904", "20905"} {
+	for _, port := range []string{"20900", "20901", "20902", "20903", "20906"} {
 		if !strings.Contains(combined, port) {
 			t.Errorf("reserved monitoring port %s is missing", port)
 		}
 	}
-	if strings.Contains(combined, "5050") {
-		t.Fatal("legacy Holmes port 5050 must not be used")
+	for _, removedPort := range []string{"20904", "20905", "5050"} {
+		if strings.Contains(combined, removedPort) {
+			t.Errorf("removed monitoring port %s is still referenced", removedPort)
+		}
 	}
 }
 
