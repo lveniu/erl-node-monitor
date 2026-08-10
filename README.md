@@ -12,7 +12,6 @@
 - [容器化部署](#容器化部署)
 - [配置说明](#配置说明)
 - [告警与钉钉通知](#告警与钉钉通知)
-- [可选：HolmesGPT 根因分析](#可选holmesgpt-根因分析)
 - [可选：运维 Ops Agent](#可选运维-ops-agent)
 - [验证与测试](#验证与测试)
 - [相关文档](#相关文档)
@@ -51,49 +50,33 @@
 可选服务（不阻断主链路）：
 
 ```text
-   Grafana ──同源插件代理──▶ holmes-gateway (Go :20904) ──▶ HolmesGPT :20905 ──▶ GLM / Kimi
-   Grafana ──同源插件代理──▶ ops-agent      (Go :20906) ──▶ GLM / Anthropic
+   Grafana ──同源插件代理──▶ ops-agent (Go :20906) ──▶ GLM / Anthropic
 ```
 
 ### Agent 应用层
 
-主链路（Exporter → Prometheus → Alertmanager → Grafana）只解决"采集、存储、告警、展示"。当告警发生时，仍然要由人去翻面板、SSH 上机器、跑 `mnode:i()` / `etop` / `observer` 才能定位根因。Agent 应用层在主链路之外加两条可选通道，把"分析决策"和"低风险动作"分别交给受控的 LLM 流程，避免把 SSH 凭据或排查上下文直接放到浏览器或模型手里。
-
-#### HolmesGPT 根因分析（`cmd/holmes-gateway` + Holmes Server）
-
-| 组件 | 默认端口 | 职责 |
-| --- | --- | --- |
-| Grafana 插件代理 | 同源 20900 | 浏览器只与 Grafana 通信；插件用 `secureJsonData` 注入内部 Bearer Token 和真实 `X-Grafana-User` |
-| `holmes-gateway`（Go） | `127.0.0.1:20904` | 会话状态机、工具白名单、Admin 单次审批、SSE 转换、JSONL 审计、`glm`/`kimi` 别名过滤 |
-| Holmes Server（Python 3.11） | `127.0.0.1:20905` | HolmesGPT 0.38.1（固定 commit），多轮工具调用，调用 GLM / Kimi |
-| Exporter（已有） | `127.0.0.1:20903` | 提供 Prometheus 指标查询、受控 SSH/Erlang 诊断接口 |
-
-流程：用户在 Grafana 的 `/a/erlang-monitor-controls-app/holmes` 页面发起调查 → 插件代理转发到 Gateway，带入固定 `server_id`、节点候选、时间范围和最多一个匹配告警 → Gateway 用 `glm`/`kimi` 别名调用模型，模型只能用 `get_host_snapshot`、`list_erlang_nodes`、`get_node_snapshot`、`get_scheduler_hotspots`、`get_process_hotspots` 五个受控工具 → 任何 SSH 或 RPC 调用都经过 Exporter 现有的 SSH + 一次性隐藏 Erlang 节点通道，不接受模型自报的 IP/端口/密钥 → Admin 在页面单次审批后工具才会真正执行，最多 12 次工具调用、累计 256 KiB 输出、单工具 10/45 秒超时。
-
-不放出的东西：上游模型 ID、API Base、API Key、推理过程字段、`role_数字` / 11 位以上业务标识（脱敏）、认证头、完整 SSH 配置。会话 JSON 持久化在 Gateway 本地，7 天/100 会话保留，重启可恢复但失败时不破坏新轮次。
+主链路（Exporter → Prometheus → Alertmanager → Grafana）只解决"采集、存储、告警、展示"。当告警发生时，仍然要由人去翻面板、SSH 上机器、跑 `mnode:i()` / `etop` / `observer` 才能定位和处理。Ops Agent 是主链路之外的一条可选通道，把"低风险只读排查"交给受控的 LLM 流程，避免把 SSH 凭据或排查上下文直接放到浏览器或模型手里。
 
 #### Ops Agent 单任务运维（`cmd/ops-agent`）
 
 | 组件 | 默认端口 | 职责 |
 | --- | --- | --- |
-| Grafana 插件代理 | 同源 20900 | 同上，注入 `ops_agent_tool_api_token` |
+| Grafana 插件代理 | 同源 20900 | 浏览器只与 Grafana 通信；插件用 `secureJsonData` 注入内部 Bearer Token 和真实 `X-Grafana-User` |
 | `ops-agent`（Go） | `127.0.0.1:20906` | 单任务编排、Skill 加载、Shell 审批、超时与脱敏 |
 | 内网游戏服 | `192.168.100.*` | 仅允许配置清单中的内网地址；不允许横向 SSH |
 
-流程：Editor 在 `/a/erlang-monitor-controls-app/ops-agent` 页面选择一台内网节点并提问 → Agent 加载 `ops-agent/skills/*/SKILL.md` 中的一个 Skill，未加载 Skill 时拒绝任何 Shell 调用 → Shell 命令必须先经过通用安全校验、内网服务器校验和 Skill 职责校验三道闸 → 纯 `ls/grep/ps/cd/head/tail/df/find` 只读组合直接执行；`find -exec*/-delete*` 等可写/可执行谓词进 Grafana Admin 单次审批 → 输出脱敏后返回模型 → 最长 30 分钟、单任务、内存内状态、不提供长期记忆。
+流程：Editor 在 `/a/erlang-monitor-controls-app/ops-agent` 页面选择一台内网节点并提问 → 插件代理转发到 Agent，注入内部 Token 和真实 Grafana 用户 → Agent 加载 `ops-agent/skills/*/SKILL.md` 中的一个 Skill，未加载 Skill 时拒绝任何 Shell 调用 → Shell 命令必须先经过通用安全校验、内网服务器校验和 Skill 职责校验三道闸 → 纯 `ls/grep/ps/cd/head/tail/df/find` 只读组合直接执行；`find -exec*/-delete*` 等可写/可执行谓词进 Grafana Admin 单次审批 → 输出脱敏后返回模型 → 最长 30 分钟、单任务、内存内状态、不提供长期记忆。
 
 永久拒绝（Admin 批准也不能绕过）：删除白名单外路径、主机关停与格式化、提权、手工杀进程、横向 SSH、读取服务器隐私数据。
 
 #### Agent 与主链路的依赖关系
 
-- HolmesGPT 和 Ops Agent 都依赖 Exporter 已配置的服务器清单与 SSH 通道，自身不持有第二种 SSH 凭据；Exporter 没有部署的机器，Agent 也无法触达。
-- HolmesGPT 依赖 Prometheus 提供告警上下文（标签、时间范围），但 Prometheus 不可用时 Gateway 仍可基于 Exporter `/status` 与受控工具完成调查。
-- Ops Agent 与 HolmesGPT 互相独立：停掉任一 profile 都不影响主链路和另一个 Agent。
-- 两条 Agent 通道都是可选 profile（`--profile holmes` / `--profile ops-agent`），不部署时不消耗资源、不开放额外端口。
+- Ops Agent 依赖 Exporter 已配置的服务器清单与 SSH 通道，自身不持有第二种 SSH 凭据；Exporter 没有部署的机器，Agent 也无法触达。
+- Ops Agent 是可选 profile（`--profile ops-agent`），不部署时不消耗资源、不开放额外端口，也不影响主链路。
 
 ### 关键信任边界
 
-- 浏览器只访问 Grafana（同源插件代理），不直接持有 Holmes、模型、Prometheus 或 SSH 凭据。
+- 浏览器只访问 Grafana（同源插件代理），不直接持有模型、Prometheus 或 SSH 凭据。
 - Exporter 通过 SSH 在远端启动一次性隐藏 Erlang 节点执行只读 RPC，不在游戏服上留存进程或文件。
 - 所有 Secret 通过文件或环境变量注入，不写入 YAML，也不进入日志。
 
@@ -108,7 +91,6 @@
 - **配置热加载**：Exporter 每 5 秒以 SHA-256 比对配置文件，校验通过后热更新默认项与服务器项，错误配置不会替换当前有效配置。
 - **结构化日志 + 状态持久化**：JSON 日志、持久化的最后状态文件，便于故障后直接定位。
 - **集成钉钉适配器**：Markdown 通知、HMAC 签名、按服务器 glob 过滤接收人、恢复通知，统一在 Exporter 进程内提供。
-- **可选 HolmesGPT 根因分析**：独立 Go 网关、GLM/Kimi 别名、Prometheus 只读证据、受控 SSH/Erlang 工具、Admin 单次审批、会话恢复和 JSONL 审计。
 - **可选运维 Ops Agent**：单任务、单服务器、Skill 受控的轻量 Agent，白名单 Shell 自动执行，可写/可执行谓词经 Grafana Admin 单次审批。
 
 ## 仓库目录
@@ -116,15 +98,12 @@
 ```text
 cmd/
   erlang-exporter/          # 主采集器 + 钉钉适配器入口（:20903）
-  holmes-gateway/           # HolmesGPT 网关入口（:20904）
   ops-agent/                # 运维 Agent 入口（:20906）
-  holmes-diagnostic-smoke/  # Holmes 诊断冒烟工具
 internal/
   config/                   # YAML 加载 + 热重载
   exporter/                 # Prometheus 指标 + 调度器
   sshprobe/                 # SSH + Erlang RPC 采集
   dingtalk/                 # 钉钉适配器
-  holmesgateway/            # Holmes 网关逻辑
   opsagent/                 # Ops Agent 逻辑
   runtime/                  # 状态持久化
   sshprobe/                 # SSH 与诊断
@@ -136,10 +115,9 @@ config/
 prometheus/                 # 抓取配置 + 16 条告警规则
 alertmanager/               # 分组、抑制、钉钉路由
 grafana/                    # 数据源、仪表板、unsigned 插件 erlang-monitor-controls-app
-holmes/                     # HolmesGPT 配置、Skills、模型清单
 ops-agent/                  # Ops Agent 配置、Skills
 scripts/                    # PowerShell 启动、验证、安装脚本
-docs/                       # 部署规划、测试手册、Holmes/Ops-Agent 接入说明
+docs/                       # 部署规划、测试手册、Ops-Agent 接入说明
 linux/                      # Linux 原生部署辅助
 secrets/                    # 本地 Secret（Git 忽略，仅保留 .gitkeep 与 README）
 data/                       # 运行时状态文件（Git 忽略）
@@ -147,9 +125,8 @@ logs/                       # 运行日志（Git 忽略）
 .runtime/                   # 本地一键启动器下载的 Prometheus/Alertmanager/Grafana（Git 忽略）
 bin/                        # 本地构建产物（Git 忽略）
 compose.yml                 # 主监控栈
-compose.holmes.yml          # HolmesGPT 叠加层
 compose.ops-agent.yml       # Ops Agent 叠加层
-Dockerfile                  # 多阶段构建（exporter / gateway / ops-agent）
+Dockerfile                  # 多阶段构建（exporter / ops-agent）
 启动本地监控.cmd            # Windows 一键启动器
 ```
 
@@ -207,10 +184,6 @@ secrets/dingtalk_secret
 secrets/dingtalk_at_mobiles
 secrets/dingtalk_at_user_ids
 secrets/grafana_admin_password
-secrets/holmes_api_key              # 启用 Holmes 时
-secrets/holmes_tool_api_token       # 启用 Holmes 时
-secrets/glm_api_key                 # 启用 Holmes 时
-secrets/kimi_api_key                # 启用 Holmes 时
 secrets/ops_agent_model_api_key     # 启用 Ops Agent 时
 secrets/ops_agent_tool_api_token    # 启用 Ops Agent 时
 ```
@@ -232,8 +205,6 @@ docker compose -f compose.yml up -d --build
 | Prometheus | 20901 | `${MONITOR_BIND_IP:-127.0.0.1}:20901` |
 | Alertmanager | 20902 | `${MONITOR_BIND_IP:-127.0.0.1}:20902` |
 | Erlang Exporter | 20903 | `127.0.0.1:20903`（仅容器内可达） |
-| Holmes Gateway | 20904 | `${MONITOR_BIND_IP:-127.0.0.1}:20904` |
-| Holmes Server | 20905 | 仅容器内 |
 | Ops Agent | 20906 | `${MONITOR_BIND_IP:-127.0.0.1}:20906` |
 
 ## 配置说明
@@ -317,23 +288,9 @@ Alertmanager 按 `alertname/severity/server/node` 分组，首次等待 15 秒�
 - 发送失败时内置模块返回 HTTP 502，让 Alertmanager 按自身机制重试；失败原因写入状态文件并使 `/dingtalk/healthz` 返回 503。Webhook 地址、签名密钥和 SSH 口令不会进入日志。
 - 当前测试机器人的安全关键词已验证为 `服务器`，默认标题前缀 `[Erlang服务器监控]`，标题根据 `server` 标签追加 `【qt-01】` 等区服标识；正文以中文摘要为事件标题，将 `condition` 显示为"判断条件"。恢复通知只保留对象、当前值、标签和时间。更换机器人后应同步核对其安全关键词或 HMAC 配置。
 
-## 可选：HolmesGPT 根因分析
-
-HolmesGPT 0.38.1（固定版本）提供告警根因分析：独立 Go 网关、GLM/Kimi 服务端别名、Prometheus 只读证据、受控 SSH/Erlang 工具、Admin 单次审批、会话恢复和 JSONL 审计。Holmes 不可用不阻断原监控链路。
-
-需求基线见 [docs/holmesgpt-integration-requirements.md](docs/holmesgpt-integration-requirements.md)，接入说明见 [docs/holmesgpt-operations.md](docs/holmesgpt-operations.md)。没有真实模型 Secret 时不会运行或声称通过 GLM/Kimi 烟测。
-
-容器启动：
-
-```bash
-docker compose -f compose.yml -f compose.holmes.yml --profile holmes up -d --build
-```
-
-Grafana 页面为 `/a/erlang-monitor-controls-app/holmes`。每台 Erlang 仪表板会出现"Holmes 分析"入口，带入固定服务器、节点候选、当前时间范围，以及与所选节点匹配的一个活动告警。
-
 ## 可选：运维 Ops Agent
 
-`cmd/ops-agent` 提供一个不依赖 Holmes 的轻量 Agent：只接受配置地址属于 `192.168.100.*` 的当前内网服务器，并且必须先加载 `ops-agent/skills` 中的项目 Skill，Shell 只能服务于已加载 Skill 的职责。
+`cmd/ops-agent` 提供一个轻量 Agent：只接受配置地址属于 `192.168.100.*` 的当前内网服务器，并且必须先加载 `ops-agent/skills` 中的项目 Skill，Shell 只能服务于已加载 Skill 的职责。
 
 - 完全由 `ls`、`grep`、`ps`、`cd`、`head`、`tail`、`df`、`find` 组成的只读单命令、管道或 `&&` 组合自动执行。
 - `find -exec/-execdir/-ok/-okdir/-delete/-fls/-fprint*` 等可写或可执行谓词以及其他允许的 Shell 仍由 Grafana Admin 单次审批。
@@ -371,14 +328,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify.ps1
 ```powershell
 # Exporter 配置
 .\bin\erlang-exporter.exe -config config/servers.example.yml -check-config
-
-# Holmes 网关配置（任一目标配置）
-.\bin\holmes-gateway.exe -config holmes/gateway.example.yml -servers config/servers.example.yml -check-config
 ```
-
-### 真实模型烟测
-
-普通聊天成功不等于可用。生产模型必须用 `scripts/smoke-real-models.ps1` 分别完成 Prometheus、受控诊断、至少两轮工具、审批暂停、成功的热点调用、最终中文 RCA 和连续追问。该脚本默认拒绝运行，只有提供 Secret、核对模型成本并同时传入 `-Execute -ApproveHotspots` 后才会调用真实供应商。`-RequireCompaction` 把真实上下文压缩作为强制门槛。详见 [docs/holmesgpt-operations.md](docs/holmesgpt-operations.md)。
 
 ### 集成端到端验证
 
@@ -431,7 +381,5 @@ CPU、内存、磁盘仪表 + 节点状态表 + 活动告警列表，同一页�
 
 - [测试人员配置与验收手册](docs/tester-configuration-guide.md)
 - [运维 Agent 权限、流程与职责说明](docs/ops-agent-overview.md)
-- [HolmesGPT 运维根因分析接入需求](docs/holmesgpt-integration-requirements.md)
-- [HolmesGPT 运维根因分析接入说明](docs/holmesgpt-operations.md)
 - [调度控制接口](docs/scheduling-control.md)
 - [部署清单](docs/deployment/inventory.yml)
