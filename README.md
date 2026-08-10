@@ -55,6 +55,42 @@
    Grafana ──同源插件代理──▶ ops-agent      (Go :20906) ──▶ GLM / Anthropic
 ```
 
+### Agent 应用层
+
+主链路（Exporter → Prometheus → Alertmanager → Grafana）只解决"采集、存储、告警、展示"。当告警发生时，仍然要由人去翻面板、SSH 上机器、跑 `mnode:i()` / `etop` / `observer` 才能定位根因。Agent 应用层在主链路之外加两条可选通道，把"分析决策"和"低风险动作"分别交给受控的 LLM 流程，避免把 SSH 凭据或排查上下文直接放到浏览器或模型手里。
+
+#### HolmesGPT 根因分析（`cmd/holmes-gateway` + Holmes Server）
+
+| 组件 | 默认端口 | 职责 |
+| --- | --- | --- |
+| Grafana 插件代理 | 同源 20900 | 浏览器只与 Grafana 通信；插件用 `secureJsonData` 注入内部 Bearer Token 和真实 `X-Grafana-User` |
+| `holmes-gateway`（Go） | `127.0.0.1:20904` | 会话状态机、工具白名单、Admin 单次审批、SSE 转换、JSONL 审计、`glm`/`kimi` 别名过滤 |
+| Holmes Server（Python 3.11） | `127.0.0.1:20905` | HolmesGPT 0.38.1（固定 commit），多轮工具调用，调用 GLM / Kimi |
+| Exporter（已有） | `127.0.0.1:20903` | 提供 Prometheus 指标查询、受控 SSH/Erlang 诊断接口 |
+
+流程：用户在 Grafana 的 `/a/erlang-monitor-controls-app/holmes` 页面发起调查 → 插件代理转发到 Gateway，带入固定 `server_id`、节点候选、时间范围和最多一个匹配告警 → Gateway 用 `glm`/`kimi` 别名调用模型，模型只能用 `get_host_snapshot`、`list_erlang_nodes`、`get_node_snapshot`、`get_scheduler_hotspots`、`get_process_hotspots` 五个受控工具 → 任何 SSH 或 RPC 调用都经过 Exporter 现有的 SSH + 一次性隐藏 Erlang 节点通道，不接受模型自报的 IP/端口/密钥 → Admin 在页面单次审批后工具才会真正执行，最多 12 次工具调用、累计 256 KiB 输出、单工具 10/45 秒超时。
+
+不放出的东西：上游模型 ID、API Base、API Key、推理过程字段、`role_数字` / 11 位以上业务标识（脱敏）、认证头、完整 SSH 配置。会话 JSON 持久化在 Gateway 本地，7 天/100 会话保留，重启可恢复但失败时不破坏新轮次。
+
+#### Ops Agent 单任务运维（`cmd/ops-agent`）
+
+| 组件 | 默认端口 | 职责 |
+| --- | --- | --- |
+| Grafana 插件代理 | 同源 20900 | 同上，注入 `ops_agent_tool_api_token` |
+| `ops-agent`（Go） | `127.0.0.1:20906` | 单任务编排、Skill 加载、Shell 审批、超时与脱敏 |
+| 内网游戏服 | `192.168.100.*` | 仅允许配置清单中的内网地址；不允许横向 SSH |
+
+流程：Editor 在 `/a/erlang-monitor-controls-app/ops-agent` 页面选择一台内网节点并提问 → Agent 加载 `ops-agent/skills/*/SKILL.md` 中的一个 Skill，未加载 Skill 时拒绝任何 Shell 调用 → Shell 命令必须先经过通用安全校验、内网服务器校验和 Skill 职责校验三道闸 → 纯 `ls/grep/ps/cd/head/tail/df/find` 只读组合直接执行；`find -exec*/-delete*` 等可写/可执行谓词进 Grafana Admin 单次审批 → 输出脱敏后返回模型 → 最长 30 分钟、单任务、内存内状态、不提供长期记忆。
+
+永久拒绝（Admin 批准也不能绕过）：删除白名单外路径、主机关停与格式化、提权、手工杀进程、横向 SSH、读取服务器隐私数据。
+
+#### Agent 与主链路的依赖关系
+
+- HolmesGPT 和 Ops Agent 都依赖 Exporter 已配置的服务器清单与 SSH 通道，自身不持有第二种 SSH 凭据；Exporter 没有部署的机器，Agent 也无法触达。
+- HolmesGPT 依赖 Prometheus 提供告警上下文（标签、时间范围），但 Prometheus 不可用时 Gateway 仍可基于 Exporter `/status` 与受控工具完成调查。
+- Ops Agent 与 HolmesGPT 互相独立：停掉任一 profile 都不影响主链路和另一个 Agent。
+- 两条 Agent 通道都是可选 profile（`--profile holmes` / `--profile ops-agent`），不部署时不消耗资源、不开放额外端口。
+
 ### 关键信任边界
 
 - 浏览器只访问 Grafana（同源插件代理），不直接持有 Holmes、模型、Prometheus 或 SSH 凭据。
