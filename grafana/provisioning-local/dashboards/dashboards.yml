@@ -1,0 +1,41 @@
+apiVersion: 1
+
+providers:
+  - name: qt-01 Monitoring
+    orgId: 1
+    folder: qt-01
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: ${ERLANG_MONITOR_DASHBOARDS_PATH}
+
+  - name: qt-01 Internal Monitoring
+    orgId: 1
+    folder: qt-01内网
+    folderUid: dfu4oqx4rqmm8f
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: ${ERLANG_MONITOR_INTERNAL_DASHBOARDS_PATH}
+
+  - name: qt-05 Internal Monitoring
+    orgId: 1
+    folder: qt-05内网
+    folderUid: dfu56gegpvqbkc
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: ${ERLANG_MONITOR_QT05_INTERNAL_DASHBOARDS_PATH}
+
+  - name: qt-07 Internal Monitoring
+    orgId: 1
+    folder: qt-07内网
+    folderUid: dfu57gegpvqbkc
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: ${ERLANG_MONITOR_QT07_INTERNAL_DASHBOARDS_PATH}

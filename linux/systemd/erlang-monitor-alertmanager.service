@@ -1,0 +1,19 @@
+[Unit]
+Description=Erlang Monitor Alertmanager
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=erlang-monitor
+Group=erlang-monitor
+WorkingDirectory=/data/node_monitor/alertmanager
+UMask=0027
+ExecStart=/opt/erlang-monitor/alertmanager/alertmanager --config.file=/data/node_monitor/alertmanager/alertmanager.local.yml --storage.path=/data/node_monitor/data/alertmanager --web.listen-address=127.0.0.1:20902
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

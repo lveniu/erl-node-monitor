@@ -1,0 +1,17 @@
+# HolmesGPT 0.38.1 local Windows configuration.
+max_steps: 20
+custom_skill_paths:
+  - ./holmes/skills
+toolsets:
+  prometheus/metrics:
+    enabled: true
+    subtype: prometheus
+    config:
+      prometheus_url: http://127.0.0.1:20901
+      tool_calls_return_data: true
+  bash:
+    enabled: false
+  kubernetes/core:
+    enabled: false
+  internet:
+    enabled: false

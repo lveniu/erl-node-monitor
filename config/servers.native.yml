@@ -1,0 +1,195 @@
+defaults:
+  poll_interval: 30m
+  confirm_interval: 10s
+  node_failure_confirm_interval: 3m
+  confirm_attempts: 1
+  connect_timeout: 10s
+  command_timeout: 45s
+  collection_stale_after: 40m
+  queue_threshold: 100
+  memory_threshold_mb: 200
+  host_cpu_alert_percent: 80
+  host_memory_alert_percent: 80
+  vm_memory_display_gb: 10
+  vm_memory_alert_gb: 15
+  capacity_alert_percent: 80
+  run_queue_display_multiplier: 4
+  run_queue_alert_multiplier: 16
+
+# 仅过滤钉钉通知；Prometheus、Alertmanager和Grafana仍保留这些节点的告警和指标。
+# 键为下方的 server id，值支持精确节点名以及 * / ? / [] 通配符。修改后约5秒热加载。
+alert_filters:
+  ignored_nodes:
+    qt01-test-s0:
+      - "wl_mixcn_999"
+      - "wl_bot_1"
+  # ignored_nodes:
+  #   qt01-internal-act:
+  #     - "wl_act_8.bk.*"
+  #     - "wl_temporary_?@127.0.0.1"
+
+servers:
+  # 每个 server 条目可以使用不同的 IP、name、SSH 端口、认证方式和密钥。
+  # 方案 A：使用本机 SSH Agent。gc 与 ga 共用当前已 ssh-add 的同一组密钥。
+  - id: external-live-check
+    name: 101.34.55.142
+    enabled: true
+    address: 101.34.55.142:43999
+    username: admin
+    use_ssh_agent: true
+    # 仅从文件提取公钥身份，用于锁定 Agent 中已解锁的同一把密钥；不直接读取私钥登录。
+    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
+    host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
+    filesystem_path: /
+    instance_directory: /data/server
+
+  # qt-01 / 101.35.19.137(game) (ga)：与上面的 gc 共用 SSH Agent 密钥。
+  - id: qt01-ga
+    name: 101.35.19.137
+    enabled: true
+    address: 101.35.19.137:43999
+    username: admin
+    use_ssh_agent: true
+    # 与142相同的SSH Agent密钥。
+    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
+    host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
+    filesystem_path: /
+
+    # 扫描 /data/server/*/wl_* 形成预期节点清单；saccter 等无 wl_* 子目录的目录不会计入。
+    instance_directory: /data/server
+
+  # qt-01 / 150.158.94.69(game) (gb)：与 gc、ga 共用 SSH Agent 密钥。
+  - id: qt01-gb
+    name: 150.158.94.69
+    enabled: true
+    address: 150.158.94.69:43999
+    username: admin
+    use_ssh_agent: true
+    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
+    host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
+    filesystem_path: /
+    instance_directory: /data/server
+
+  # qt-01 / 162.14.141.52(test_game,s0)：使用同一 SSH Agent 密钥。
+  - id: qt01-test-s0
+    name: 162.14.141.52
+    enabled: true
+    address: 162.14.141.52:43999
+    username: admin
+    use_ssh_agent: true
+    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
+    host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
+    filesystem_path: /
+    instance_directory: /data/server
+
+  # qt-01 / 49.234.183.253(game) (gd)：使用同一 SSH Agent 密钥。
+  - id: qt01-gd
+    name: 49.234.183.253
+    enabled: true
+    address: 49.234.183.253:43999
+    username: admin
+    use_ssh_agent: true
+    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
+    host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
+    filesystem_path: /
+    instance_directory: /data/server
+
+  # qt-01内网 / 192.168.100.23(debug)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt01-internal-debug
+    name: 192.168.100.23
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.23:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # qt-01内网 / 192.168.100.25(act)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt01-internal-act
+    name: 192.168.100.25
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.25:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # qt-05内网 / 192.168.100.33(debug)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt05-internal-debug
+    name: 192.168.100.33
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.33:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # qt-05内网 / 192.168.100.37(act)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt05-internal-act
+    name: 192.168.100.37
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.37:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # qt-07内网 / 192.168.100.47(debug)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt07-internal-debug
+    name: 192.168.100.47
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.47:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # qt-07内网 / 192.168.100.48(act)：直接读取专用私钥并固定当前 ECDSA 主机指纹。
+  - id: qt07-internal-act
+    name: 192.168.100.48
+    enabled: true
+    poll_interval: 5m
+    address: 192.168.100.48:61618
+    username: root
+    private_key_file: "secrets/ssh/qt_identity"
+    host_key_sha256: "SHA256:9OGyiBcTmwDOluMnNYuYr/aaVyyx0tUvzvjpcZoVO9M"
+    filesystem_path: /
+    instance_directory: /data
+
+  # 方案 A 示例：复制下面条目后，替换 id/name/address；每个条目可以使用不同 Agent 密钥。
+  # - id: qt01-game-02
+  #   name: 203.0.113.10
+  #   enabled: true
+  #   address: 203.0.113.10:43999
+  #   username: admin
+  #   use_ssh_agent: true
+  #   ssh_key_file: secrets/ssh/qt01-game-02.pub
+  #   host_key_sha256: "SHA256:REPLACE_WITH_VERIFIED_FINGERPRINT"
+  #   filesystem_path: /
+
+  # 方案 B 示例：不使用 Agent，直接指定该服务器自己的私钥和口令文件。
+  # - id: qt01-gc
+  #   name: 203.0.113.11
+  #   enabled: true
+  #   address: 203.0.113.11:43999
+  #   username: admin
+  #   use_ssh_agent: false
+  #   private_key_file: secrets/ssh/qt01-gc.key
+  #   private_key_passphrase_file: secrets/ssh/qt01-gc.passphrase
+  #   host_key_sha256: "SHA256:REPLACE_WITH_VERIFIED_FINGERPRINT"
+  #   filesystem_path: /

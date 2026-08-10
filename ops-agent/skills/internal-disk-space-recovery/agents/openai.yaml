@@ -1,0 +1,4 @@
+interface:
+  display_name: "内网磁盘空间恢复"
+  short_description: "仅限192.168.100.*并按固定路径分阶段恢复磁盘空间"
+  default_prompt: "Use $internal-disk-space-recovery to safely recover disk space on the current 192.168.100.* server."

@@ -1,0 +1,43 @@
+defaults:
+  # 正常低频采集；Run Queue异常及采集失败等待10秒，节点连接或进程消失等待3分钟，仅复核一次；其他资源异常不复核。
+  poll_interval: 30m
+  confirm_interval: 10s
+  node_failure_confirm_interval: 3m
+  # 异常只允许复核一次；节点异常会仅复核对应节点。
+  confirm_attempts: 1
+  connect_timeout: 10s
+  command_timeout: 45s
+  # 30分钟采集周期下，40分钟没有成功采集才判定过期。
+  collection_stale_after: 40m
+  queue_threshold: 100
+  memory_threshold_mb: 200
+  host_cpu_alert_percent: 80
+  host_memory_alert_percent: 80
+  vm_memory_display_gb: 10
+  vm_memory_alert_gb: 15
+  capacity_alert_percent: 80
+  # Run Queue先以调度器4倍作为异常展示门槛；超过16倍时等待confirm_interval定向复查，复查值仍高才进入告警观察期。
+  run_queue_display_multiplier: 4
+  run_queue_alert_multiplier: 16
+
+# 通知层节点过滤：键为 server id，值为精确节点名或 glob 通配模式。
+# 命中后仅不发钉钉，不删除 Prometheus/Alertmanager/Grafana 中的告警。
+alert_filters:
+  ignored_nodes:
+    external-101-34-55-142:
+      - "temporary_*.bk.*"
+
+servers:
+  - id: external-101-34-55-142
+    name: 101.34.55.142
+    # 本地准备阶段保持关闭；核对主机指纹、密钥挂载后再改为 true。
+    enabled: false
+    address: 101.34.55.142:43999
+    username: admin
+    private_key_file: /run/secrets/monitor_private_key
+    private_key_passphrase_file: /run/secrets/monitor_private_key_passphrase
+    # 必须从已信任的CRT连接记录核对，不能只信任ssh-keyscan结果。
+    host_key_sha256: "SHA256:REPLACE_WITH_VERIFIED_FINGERPRINT"
+    filesystem_path: /
+    # 可选：扫描该目录下第二层 wl_* 节点目录，用于发现进程已经消失的实例。
+    instance_directory: /data/server

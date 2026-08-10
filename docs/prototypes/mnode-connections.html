@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MNode 节点连接视图·静态原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #eef2e7;
+      --muted: #8d9789;
+      --dim: #606a5f;
+      --canvas: #0a0d0b;
+      --panel: #111612;
+      --panel-2: #161c17;
+      --line: #293129;
+      --line-hot: #50613f;
+      --lime: #c8ff62;
+      --lime-soft: rgba(200, 255, 98, .11);
+      --amber: #ffbe5c;
+      --amber-soft: rgba(255, 190, 92, .1);
+      --red: #ff6b61;
+      --cyan: #71d6c8;
+      --shadow: 0 22px 60px rgba(0, 0, 0, .36);
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--canvas); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 78% -10%, rgba(200,255,98,.08), transparent 28rem),
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        var(--canvas);
+      background-size: auto, 32px 32px, 32px 32px, auto;
+      font-family: "Microsoft YaHei UI", "Noto Sans SC", sans-serif;
+      font-size: 14px;
+    }
+
+    button { font: inherit; }
+    .shell { max-width: 1520px; margin: 0 auto; padding: 22px 26px 42px; }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 24px;
+      min-height: 62px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; min-width: 0; gap: 13px; }
+    .brand-mark {
+      width: 34px; height: 34px; position: relative; flex: 0 0 auto;
+      border: 1px solid var(--line-hot); background: var(--lime-soft);
+    }
+    .brand-mark::before, .brand-mark::after { content: ""; position: absolute; background: var(--lime); }
+    .brand-mark::before { width: 14px; height: 2px; left: 9px; top: 10px; box-shadow: 0 6px 0 var(--lime), 0 12px 0 var(--lime); }
+    .brand-mark::after { width: 2px; height: 14px; left: 15px; top: 9px; opacity: .25; }
+    .eyebrow { color: var(--lime); letter-spacing: .16em; font: 600 10px/1.3 Bahnschrift, sans-serif; text-transform: uppercase; }
+    .brand h1 { margin: 2px 0 0; font-size: 17px; font-weight: 650; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .preview-tag { color: var(--muted); font-size: 12px; padding-left: 8px; font-weight: 400; }
+    .top-actions { display: flex; align-items: center; gap: 9px; }
+    .timestamp { color: var(--muted); font: 12px Bahnschrift, sans-serif; }
+    .live-pill { display: flex; gap: 7px; align-items: center; border: 1px solid var(--line); padding: 7px 10px; color: #cdd5ca; background: rgba(17,22,18,.75); }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 5px rgba(200,255,98,.08); }
+
+    .context-bar {
+      display: grid; grid-template-columns: minmax(260px, 1fr) auto; gap: 18px; align-items: end;
+      padding: 24px 0 18px;
+    }
+    .context-title h2 { margin: 3px 0 6px; font-size: clamp(25px, 3.2vw, 42px); line-height: 1.05; letter-spacing: -.035em; font-weight: 680; }
+    .context-title p { margin: 0; color: var(--muted); max-width: 710px; }
+    .context-meta { text-align: right; }
+    .context-meta span { display: block; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+    .context-meta strong { display: block; margin-top: 4px; font: 600 14px Bahnschrift, sans-serif; }
+
+    .sample-switcher { display: flex; gap: 7px; flex-wrap: wrap; margin: 0 0 18px; }
+    .sample-button {
+      cursor: pointer; border: 1px solid var(--line); color: var(--muted); background: var(--panel);
+      padding: 7px 11px; transition: border-color .18s ease, color .18s ease, background .18s ease;
+    }
+    .sample-button:hover { color: var(--ink); border-color: #526052; }
+    .sample-button.active { color: var(--canvas); background: var(--lime); border-color: var(--lime); font-weight: 700; }
+
+    .summary-grid { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 14px; }
+    .topology-panel, .readout-panel, .node-panel, .contract-panel {
+      border: 1px solid var(--line); background: rgba(17, 22, 18, .94); box-shadow: var(--shadow);
+    }
+    .panel-head { min-height: 48px; padding: 12px 15px; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .panel-title { display: flex; align-items: center; gap: 9px; font-weight: 650; }
+    .panel-index { color: var(--dim); font: 11px Bahnschrift, sans-serif; letter-spacing: .08em; }
+    .status-good { color: var(--lime); font: 600 12px Bahnschrift, sans-serif; }
+
+    .topology {
+      min-height: 292px; padding: 30px 25px 28px; display: grid;
+      grid-template-columns: minmax(180px, 1fr) 90px minmax(180px, 1fr) 90px minmax(180px, 1fr);
+      align-items: center; position: relative; overflow: hidden;
+    }
+    .topology::before { content: ""; position: absolute; inset: auto -5% 18px; height: 80px; background: radial-gradient(ellipse, rgba(200,255,98,.045), transparent 68%); pointer-events: none; }
+    .node-block { position: relative; min-width: 0; height: 178px; border: 1px solid var(--line); background: var(--panel-2); padding: 17px; transition: transform .2s ease, border-color .2s ease; }
+    .node-block:hover { transform: translateY(-3px); border-color: #4b584b; }
+    .node-block::after { content: ""; position: absolute; left: 0; top: 0; width: 30px; height: 3px; background: var(--cyan); }
+    .node-block.central::after { background: var(--lime); width: 58px; }
+    .node-block.region::after { background: var(--amber); width: 44px; }
+    .node-kicker { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+    .node-role { font-family: Bahnschrift, sans-serif; text-transform: uppercase; }
+    .node-state { display: inline-flex; align-items: center; gap: 5px; color: var(--lime); }
+    .node-state::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .node-name { margin: 24px 0 5px; font: 600 16px/1.35 Bahnschrift, "Microsoft YaHei UI", sans-serif; overflow-wrap: anywhere; }
+    .node-id { color: var(--muted); font: 12px Bahnschrift, sans-serif; }
+    .node-foot { position: absolute; left: 17px; right: 17px; bottom: 15px; padding-top: 11px; border-top: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; }
+    .node-foot strong { color: var(--ink); font: 600 12px Bahnschrift, sans-serif; }
+
+    .link { height: 1px; background: linear-gradient(90deg, var(--line), var(--lime), var(--line)); position: relative; opacity: .9; }
+    .link::before { content: ""; position: absolute; width: 7px; height: 7px; border-radius: 50%; background: var(--lime); top: -3px; animation: travel 2.4s linear infinite; box-shadow: 0 0 10px rgba(200,255,98,.55); }
+    .link::after { content: "RPC"; position: absolute; width: 100%; top: 9px; color: var(--dim); text-align: center; font: 9px Bahnschrift, sans-serif; letter-spacing: .14em; }
+    .link.region-link { background: linear-gradient(90deg, var(--line), var(--amber), var(--line)); }
+    .link.region-link::before { background: var(--amber); animation-delay: -1.2s; box-shadow: 0 0 10px rgba(255,190,92,.45); }
+    @keyframes travel { from { left: 2%; } to { left: 94%; } }
+
+    .readout-panel { display: grid; grid-template-rows: auto 1fr; }
+    .readouts { display: grid; align-content: start; }
+    .readout { padding: 17px 16px; border-bottom: 1px solid var(--line); }
+    .readout:last-child { border-bottom: 0; }
+    .readout-label { color: var(--muted); font-size: 11px; letter-spacing: .08em; }
+    .readout-value { margin-top: 6px; font: 600 30px/1 Bahnschrift, sans-serif; letter-spacing: -.03em; }
+    .readout-value small { color: var(--muted); font-size: 11px; letter-spacing: .02em; margin-left: 4px; font-weight: 400; }
+    .readout-note { margin-top: 8px; color: var(--dim); font-size: 11px; }
+
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+    .node-list { padding: 0; }
+    .connection-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 76px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
+    .connection-row:last-child { border-bottom: 0; }
+    .type-chip { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--line-hot); color: var(--lime); background: var(--lime-soft); font: 700 11px Bahnschrift, sans-serif; }
+    .region-panel .type-chip { color: var(--amber); border-color: #5e4b2c; background: var(--amber-soft); }
+    .connection-main { min-width: 0; }
+    .connection-main strong { display: block; font: 600 14px Bahnschrift, "Microsoft YaHei UI", sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .connection-main span { display: block; margin-top: 4px; color: var(--muted); font: 11px Bahnschrift, sans-serif; }
+    .state-cell { text-align: right; }
+    .state-cell strong { display: block; color: var(--lime); font: 600 12px Bahnschrift, sans-serif; }
+    .state-cell span { color: var(--muted); font-size: 10px; }
+    .empty-state { min-height: 152px; display: grid; place-items: center; padding: 28px; color: var(--muted); text-align: center; }
+
+    .contract-panel { margin-top: 14px; box-shadow: none; }
+    .contract-grid { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .contract-item { padding: 15px; border-right: 1px solid var(--line); }
+    .contract-item:last-child { border-right: 0; }
+    .contract-item b { display: block; margin-bottom: 5px; font: 600 12px Bahnschrift, sans-serif; }
+    .contract-item span { color: var(--muted); font-size: 11px; line-height: 1.55; }
+    .legend-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; background: var(--lime); }
+    .legend-dot.amber { background: var(--amber); }
+    .legend-dot.red { background: var(--red); }
+    .legend-dot.gray { background: var(--dim); }
+
+    .fade { animation: reveal .42s ease both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+    @media (max-width: 1000px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      .readouts { grid-template-columns: repeat(3, 1fr); }
+      .readout { border-bottom: 0; border-right: 1px solid var(--line); }
+      .readout:last-child { border-right: 0; }
+    }
+    @media (max-width: 760px) {
+      .shell { padding: 14px 14px 30px; }
+      .topbar, .context-bar { grid-template-columns: 1fr; }
+      .top-actions, .context-meta { display: none; }
+      .preview-tag { display: none; }
+      .topology { grid-template-columns: 1fr; gap: 14px; padding: 18px; }
+      .node-block { height: 152px; }
+      .link { height: 35px; width: 1px; margin: 0 auto; background: linear-gradient(var(--line), var(--lime), var(--line)); }
+      .link::before { left: -3px; animation: travel-y 2.2s linear infinite; }
+      .link::after { left: 12px; top: 12px; width: auto; }
+      @keyframes travel-y { from { top: 0; } to { top: 30px; } }
+      .detail-grid { grid-template-columns: 1fr; }
+      .contract-grid { grid-template-columns: 1fr 1fr; }
+      .contract-item:nth-child(2) { border-right: 0; }
+      .contract-item:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+    }
+    @media (max-width: 460px) {
+      .readouts, .contract-grid { grid-template-columns: 1fr; }
+      .readout, .contract-item { border-right: 0; border-bottom: 1px solid var(--line); }
+      .sample-button { flex: 1 1 calc(50% - 7px); }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"></div>
+        <div>
+          <div class="eyebrow">Erlang External Monitor</div>
+          <h1>MNode 连接拓扑 <span class="preview-tag">静态原型 / Preview 01</span></h1>
+        </div>
+      </div>
+      <div class="top-actions">
+        <span class="timestamp">采样时间 2026-08-07 10:07:42</span>
+        <span class="live-pill"><i class="pulse"></i>采集链路正常</span>
+      </div>
+    </header>
+
+    <section class="context-bar">
+      <div class="context-title">
+        <div class="eyebrow">Connection intelligence / mnode:i()</div>
+        <h2 id="serverTitle">101.34.55.142 · 外服节点</h2>
+        <p>把游戏节点与中央、赛区的业务连接单独呈现，避免与 BEAM 进程在线状态混为一谈。</p>
+      </div>
+      <div class="context-meta"><span>当前目标</span><strong id="targetNode">wl_ssjj_1814@127.0.0.1</strong></div>
+    </section>
+
+    <nav class="sample-switcher" aria-label="原型数据样本">
+      <button class="sample-button active" data-sample="external">真实外服·游戏节点</button>
+      <button class="sample-button" data-sample="central">qt-01·中央节点</button>
+      <button class="sample-button" data-sample="region">qt-01·赛区节点</button>
+      <button class="sample-button" data-sample="empty">无连接样本</button>
+    </nav>
+
+    <section class="summary-grid">
+      <article class="topology-panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="panel-index">01</span><span>业务连接链路</span></div>
+          <span class="status-good" id="topologyStatus">2 / 2 可用</span>
+        </div>
+        <div class="topology" id="topology"></div>
+      </article>
+
+      <aside class="readout-panel">
+        <div class="panel-head"><div class="panel-title"><span class="panel-index">02</span><span>快照</span></div></div>
+        <div class="readouts">
+          <div class="readout"><div class="readout-label">MNODE 连接总数</div><div class="readout-value" id="totalCount">2<small>条</small></div><div class="readout-note">包含游戏、中央、赛区</div></div>
+          <div class="readout"><div class="readout-label">中央 / 赛区</div><div class="readout-value" id="crossCount">1<span style="color:var(--dim)"> / </span>1</div><div class="readout-note">按 NodeID 8... / 9... 分类</div></div>
+          <div class="readout"><div class="readout-label">可用率</div><div class="readout-value" id="usableRate">100<small>%</small></div><div class="readout-note">state = 2 视为可应用</div></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="detail-grid">
+      <article class="node-panel central-panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="panel-index">03</span><span>中央节点</span></div>
+          <span class="status-good" id="centralSummary">1 个可用</span>
+        </div>
+        <div class="node-list" id="centralList"></div>
+      </article>
+
+      <article class="node-panel region-panel">
+        <div class="panel-head">
+          <div class="panel-title"><span class="panel-index">04</span><span>赛区节点</span></div>
+          <span class="status-good" id="regionSummary">1 个可用</span>
+        </div>
+        <div class="node-list" id="regionList"></div>
+      </article>
+    </section>
+
+    <section class="contract-panel">
+      <div class="panel-head"><div class="panel-title"><span class="panel-index">05</span><span>页面状态口径</span></div><span style="color:var(--muted);font-size:11px">mnode:i() + Exporter 节点状态</span></div>
+      <div class="contract-grid">
+        <div class="contract-item"><b><i class="legend-dot"></i>可用</b><span>mnode:i() 返回对端且 state = 2。</span></div>
+        <div class="contract-item"><b><i class="legend-dot amber"></i>异常状态</b><span>有对端记录，但 state 不是 2。</span></div>
+        <div class="contract-item"><b><i class="legend-dot red"></i>节点不可达</b><span>Exporter node_up = 0，无法执行 RPC。</span></div>
+        <div class="contract-item"><b><i class="legend-dot gray"></i>未配置 / 无连接</b><span>RPC 成功但 mnode 连接表中无对应节点。</span></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const samples = {
+      external: {
+        title: '101.34.55.142 · 真实外服', target: 'wl_ssjj_1814@127.0.0.1', total: 2,
+        central: [{ nodeId: '801000001', node: 'wl_ssjj_1@172.19.33.98', state: 2 }],
+        regions: [{ nodeId: '901100005', node: 'wl_ssjj_100005@172.19.33.104', state: 2 }]
+      },
+      central: {
+        title: '192.168.100.23 · qt-01 调试服', target: 'wl_c801_1@192.168.100.23', total: 16,
+        central: [],
+        regions: [
+          { nodeId: '901000001', node: 'wl_c901_1@192.168.100.23', state: 2 },
+          { nodeId: '901000002', node: 'wl_c901_2@192.168.100.23', state: 2 }
+        ]
+      },
+      region: {
+        title: '192.168.100.23 · qt-01 调试服', target: 'wl_c901_1@192.168.100.23', total: 4,
+        central: [{ nodeId: '801000001', node: 'wl_c801_1@192.168.100.23', state: 2 }], regions: []
+      },
+      empty: {
+        title: '192.168.100.23 · qt-01 调试服', target: 'wl_debug_1@127.0.0.1', total: 0,
+        central: [], regions: []
+      }
+    };
+
+    const esc = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[char]);
+
+    function nodeBlock(role, label, node, nodeId, state) {
+      return `<article class="node-block ${role}">
+        <div class="node-kicker"><span class="node-role">${esc(label)}</span><span class="node-state">${state === 2 ? '可用' : '异常'}</span></div>
+        <div class="node-name">${esc(node)}</div>
+        <div class="node-id">NodeID ${esc(nodeId)}</div>
+        <div class="node-foot"><span>业务状态</span><strong>state ${esc(state)}</strong></div>
+      </article>`;
+    }
+
+    function connectionRows(items, role) {
+      if (!items.length) return `<div class="empty-state"><div><strong>当前无${role === 'central' ? '中央' : '赛区'}节点连接</strong><br><small>RPC 成功，不等于采集失败</small></div></div>`;
+      return items.map((item) => `<div class="connection-row fade">
+        <span class="type-chip">${role === 'central' ? 'C8' : 'C9'}</span>
+        <span class="connection-main"><strong>${esc(item.node)}</strong><span>NodeID ${esc(item.nodeId)}</span></span>
+        <span class="state-cell"><strong>${item.state === 2 ? '可用' : '异常'}</strong><span>state ${esc(item.state)}</span></span>
+      </div>`).join('');
+    }
+
+    function render(key) {
+      const data = samples[key];
+      const firstCentral = data.central[0];
+      const firstRegion = data.regions[0];
+      const usable = [...data.central, ...data.regions].filter((item) => item.state === 2).length;
+      const crossTotal = data.central.length + data.regions.length;
+
+      document.getElementById('serverTitle').textContent = data.title;
+      document.getElementById('targetNode').textContent = data.target;
+      document.getElementById('totalCount').innerHTML = `${data.total}<small>条</small>`;
+      document.getElementById('crossCount').innerHTML = `${data.central.length}<span style="color:var(--dim)"> / </span>${data.regions.length}`;
+      document.getElementById('usableRate').innerHTML = `${crossTotal ? Math.round(usable / crossTotal * 100) : 0}<small>%</small>`;
+      document.getElementById('topologyStatus').textContent = `${usable} / ${crossTotal} 可用`;
+      document.getElementById('centralSummary').textContent = `${data.central.filter(x => x.state === 2).length} 个可用`;
+      document.getElementById('regionSummary').textContent = `${data.regions.filter(x => x.state === 2).length} 个可用`;
+      document.getElementById('centralList').innerHTML = connectionRows(data.central, 'central');
+      document.getElementById('regionList').innerHTML = connectionRows(data.regions, 'region');
+
+      document.getElementById('topology').innerHTML = [
+        nodeBlock('game', '当前节点', data.target, '当前采集目标', 2),
+        '<div class="link"></div>',
+        firstCentral ? nodeBlock('central', '中央节点 / C8xx', firstCentral.node, firstCentral.nodeId, firstCentral.state) : nodeBlock('central', '中央节点 / C8xx', '当前无连接', '—', 0),
+        '<div class="link region-link"></div>',
+        firstRegion ? nodeBlock('region', '赛区节点 / C9xx', firstRegion.node, firstRegion.nodeId, firstRegion.state) : nodeBlock('region', '赛区节点 / C9xx', '当前无连接', '—', 0)
+      ].join('');
+
+      document.querySelectorAll('.sample-button').forEach((button) => button.classList.toggle('active', button.dataset.sample === key));
+    }
+
+    document.querySelectorAll('.sample-button').forEach((button) => button.addEventListener('click', () => render(button.dataset.sample)));
+    render('external');
+  </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+groups:
+  - name: erlang-exporter-availability
+    rules:
+      - alert: ErlangExporterUnavailable
+        expr: up{job="erlang-exporter"} == 0
+        for: 3m
+        labels: {severity: critical}
+        annotations:
+          summary: "Erlang监控采集器不可用"
+          value: "采集器 {{ $labels.instance }} 已不可访问"
+          condition: "Prometheus连续3分钟无法抓取Exporter"
+          impact: "所有服务器和Erlang节点状态将停止更新"
+          action: "检查本地Exporter进程、20903端口和启动日志"
+
+      - alert: ErlangServerCollectionFailed
+        expr: erlang_exporter_server_up == 0
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.name }} 服务器采集失败"
+          value: "服务器={{ $labels.server }}，地址={{ $labels.address }}"
+          condition: "SSH或Erlang RPC采集失败，并经10秒复核仍未恢复"
+          impact: "该服务器所有节点指标可能已经过期"
+          action: "检查SSH、密钥、远端BEAM进程和节点Cookie"
+
+      - alert: ErlangNodeCollectionFailed
+        expr: erlang_exporter_node_up == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.name }} 节点连接失败"
+          value: "节点={{ $labels.node }}"
+          condition: "节点RPC连接失败，并等待3分钟定向复核仍未恢复"
+          impact: "该节点指标无法更新，同服务器其他节点可能仍正常"
+          action: "检查该BEAM节点进程、节点名、Cookie和分布式端口"
+
+      - alert: ErlangCollectionStale
+        expr: time() - erlang_exporter_last_success_timestamp_seconds > on(server, name, address) erlang_exporter_collection_stale_threshold_seconds
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.name }} 采集数据已经过期"
+          value: "距上次成功采集={{ $value | humanizeDuration }}"
+          condition: "超过配置的collection_stale_after仍无成功采集（默认40分钟）"
+          impact: "总览展示的外服状态不再可信"
+          action: "检查Exporter /status、SSH连接和远端Erlang RPC"
+
+  - name: erlang-node-risk
+    rules:
+      - alert: ErlangVMMemoryHigh
+        expr: erlang_vm_memory_bytes > on(server, name, node) erlang_vm_memory_alert_threshold_bytes
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} BEAM总内存过高"
+          value: "当前BEAM总内存={{ $value | humanize1024 }}B"
+          condition: "超过配置告警阈值（默认15GiB）持续1分钟，不做Exporter复核"
+          impact: "节点可能出现缓存、ETS、二进制或进程内存持续增长"
+          action: "检查erlang:memory/0、ETS大表、binary和高内存进程"
+
+      - alert: ErlangMessageQueueHigh
+        expr: (erlang_process_message_queue_max > on(server, name, node) erlang_message_queue_threshold) * on(server, name, node) group_left(pid, registered_name, initial_call, current_function) topk by (server, name, node) (1, erlang_process_message_queue_max_info)
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} 出现消息队列积压"
+          value: "最大消息队列={{ $value | printf \"%.0f\" }}，PID={{ $labels.pid }}，注册名={{ $labels.registered_name }}，当前函数={{ $labels.current_function }}"
+          condition: "单进程消息队列超过配置阈值（默认100）持续1分钟，不做Exporter复核"
+          impact: "目标进程可能处理不及时，继续堆积会推高内存和响应延迟"
+          action: "检查该PID当前函数、调用方流量和消息消费速度"
+
+      - alert: ErlangProcessMemoryHigh
+        expr: (erlang_process_memory_max_bytes > on(server, name, node) erlang_process_memory_threshold_bytes) * on(server, name, node) group_left(pid, registered_name, initial_call, current_function) topk by (server, name, node) (1, erlang_process_memory_max_info)
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} 出现高内存Erlang进程"
+          value: "最大单进程内存={{ $value | humanize1024 }}B，PID={{ $labels.pid }}，注册名={{ $labels.registered_name }}，当前函数={{ $labels.current_function }}"
+          condition: "单进程内存超过配置阈值（默认200MiB）持续1分钟，不做Exporter复核"
+          impact: "进程可能持有大状态、大消息或未释放二进制数据"
+          action: "检查该PID的message_queue_data、binary、dictionary和业务状态"
+
+      - alert: ErlangProcessCapacityHigh
+        expr: erlang_vm_process_count / erlang_vm_process_limit > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} Process容量使用率过高"
+          value: "Process使用率={{ $value | humanizePercentage }}"
+          condition: "Process占用率超过服务器配置阈值（默认80%）持续1分钟，不做Exporter复核"
+          impact: "接近进程表上限时，新进程将无法创建"
+          action: "排查进程泄漏、异常批量创建和长期存活临时进程"
+
+      - alert: ErlangAtomCapacityHigh
+        expr: erlang_vm_atom_count / erlang_vm_atom_limit > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} Atom容量使用率过高"
+          value: "Atom使用率={{ $value | humanizePercentage }}"
+          condition: "Atom占用率超过服务器配置阈值（默认80%）持续1分钟，不做Exporter复核"
+          impact: "Atom不会被垃圾回收，耗尽会导致BEAM终止"
+          action: "立即排查list_to_atom等动态Atom创建路径"
+
+      - alert: ErlangPortCapacityHigh
+        expr: erlang_vm_port_count / erlang_vm_port_limit > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} Port容量使用率过高"
+          value: "Port使用率={{ $value | humanizePercentage }}"
+          condition: "Port占用率超过服务器配置阈值（默认80%）持续1分钟，不做Exporter复核"
+          impact: "接近Port上限时，socket、文件和外部程序将无法打开"
+          action: "排查socket、文件描述符和外部端口泄漏"
+
+      - alert: ErlangRunQueueSustainedHigh
+        expr: min_over_time((erlang_vm_run_queue / erlang_vm_schedulers_online)[10m:]) > on(server, name, node) erlang_vm_run_queue_alert_multiplier
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.node }} Erlang调度队列复查仍高"
+          value: "首次异常经Exporter定向复查后，最近10分钟记录的Run Queue/在线调度器最低值为{{ $value | printf \"%.2f\" }}倍"
+          condition: "单次Run Queue超过配置告警倍数后进入复查队列，10秒后仍高，并在Prometheus中保持10分钟（默认16倍）"
+          impact: "大量可运行Erlang进程等待调度，业务延迟可能明显上升"
+          action: "先核对Run Queue原始值和在线调度器数，再用受控进程热点采样排查reductions最高的进程"
+
+  - name: remote-host-risk
+    rules:
+      - alert: RemoteHostMetricsFailed
+        expr: erlang_host_up == 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.name }} 主机指标采集失败"
+          value: "主机={{ $labels.server }}，地址={{ $labels.address }}"
+          condition: "主机指标采集失败，并经10秒复核"
+          impact: "CPU、内存、负载和磁盘信息无法更新"
+          action: "检查/proc、df命令和SSH执行权限"
+
+      - alert: RemoteHostCPUHigh
+        expr: erlang_host_cpu_usage_ratio > on(server, name, address) erlang_host_cpu_alert_threshold_ratio
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.name }} 主机CPU使用率过高"
+          value: "当前CPU使用率={{ $value | humanizePercentage }}"
+          condition: "CPU使用率超过服务器配置阈值（默认80%）持续1分钟，不做Exporter复核"
+          impact: "BEAM调度和系统任务可能出现延迟"
+          action: "检查top、BEAM调度器利用率和异常系统进程"
+
+      - alert: RemoteHostMemoryHigh
+        expr: 1 - erlang_host_memory_available_bytes / erlang_host_memory_total_bytes > on(server, name, address) erlang_host_memory_alert_threshold_ratio
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.name }} 主机内存使用率过高"
+          value: "按MemAvailable计算，当前内存使用率={{ $value | humanizePercentage }}"
+          condition: "主机内存使用率超过服务器配置阈值（默认80%）持续1分钟，不做Exporter复核"
+          impact: "可能触发swap或OOM，影响全部Erlang节点"
+          action: "检查BEAM总内存、缓存、其他进程和系统OOM记录"
+
+      - alert: RemoteHostDiskLow
+        expr: erlang_host_filesystem_available_bytes / erlang_host_filesystem_size_bytes < 0.15 and erlang_host_filesystem_available_bytes / erlang_host_filesystem_size_bytes >= 0.08
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.name }} 磁盘可用空间低于15%"
+          value: "当前可用比例={{ $value | humanizePercentage }}"
+          condition: "配置监控目录所在磁盘可用比例持续15分钟低于15%"
+          impact: "日志、数据和系统临时文件可能无法继续写入"
+          action: "检查磁盘增长来源并按运维流程扩容或清理"
+
+      - alert: RemoteHostDiskCritical
+        expr: erlang_host_filesystem_available_bytes / erlang_host_filesystem_size_bytes < 0.08
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.name }} 磁盘可用空间低于8%"
+          value: "当前可用比例={{ $value | humanizePercentage }}"
+          condition: "配置监控目录所在磁盘可用比例持续5分钟低于8%"
+          impact: "磁盘即将耗尽，服务存在写入失败风险"
+          action: "立即扩容或按确认过的运维流程释放空间"

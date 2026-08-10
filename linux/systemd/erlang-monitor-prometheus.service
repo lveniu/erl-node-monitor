@@ -1,0 +1,20 @@
+[Unit]
+Description=Erlang Monitor Prometheus
+Wants=network-online.target
+After=network-online.target erlang-monitor-alertmanager.service erlang-monitor-exporter.service
+
+[Service]
+Type=simple
+User=erlang-monitor
+Group=erlang-monitor
+WorkingDirectory=/data/node_monitor/prometheus
+UMask=0027
+ExecStart=/opt/erlang-monitor/prometheus/prometheus --config.file=/data/node_monitor/prometheus/prometheus.local.yml --storage.tsdb.path=/data/node_monitor/data/prometheus --storage.tsdb.retention.time=30d --web.listen-address=127.0.0.1:20901 --web.enable-lifecycle
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

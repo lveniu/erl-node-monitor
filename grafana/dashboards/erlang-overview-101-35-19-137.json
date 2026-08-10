@@ -1,0 +1,575 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": true,
+      "tags": [
+        "qt-01"
+      ],
+      "targetBlank": false,
+      "title": "目录-页面",
+      "tooltip": "自动列出 qt-01 目录下带 qt-01 标签的全部仪表板页面",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "展示当前页面对应服务器最近一次成功采集的时间。此时间由Exporter成功采集时间戳生成，不是浏览器刷新时间。",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "dateTimeAsIso"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 8,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "editorMode": "code",
+          "expr": "max(erlang_exporter_last_success_timestamp_seconds{name=~\"$server\"}) * 1000",
+          "instant": true,
+          "legendFormat": "最近一次采集时间",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "最近一次采集时间",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "逐节点显示最近一次采集的RPC连接状态和Erlang进程总数。节点离线后等待10秒，只定向复核对应节点一次。",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "离线"
+                },
+                "1": {
+                  "color": "green",
+                  "text": "在线"
+                },
+                "NaN": {
+                  "color": "gray",
+                  "text": "待mlib_sys接口"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 3
+      },
+      "id": 1,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "label_replace(erlang_exporter_node_up{name=~\"$server\"}, \"metric\", \"状态\", \"\", \"\") or label_replace(erlang_game_registered_users{name=~\"$server\"}, \"metric\", \"注册人数\", \"\", \"\") or label_replace(erlang_game_online_users{name=~\"$server\"}, \"metric\", \"在线人数\", \"\", \"\") or label_replace(erlang_vm_process_count{name=~\"$server\"}, \"metric\", \"进程总数\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Erlang节点状态",
+      "transformations": [
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "metric",
+            "rowField": "node",
+            "valueField": "Value"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "renameByName": {
+              "name": "服务器",
+              "node": "节点",
+              "node\\metric": "节点",
+              "状态": "状态",
+              "进程总数": "进程总数"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "日常只展示CPU、内存、磁盘使用率和网络收发。容量原始值继续保留在Prometheus中供告警和诊断使用。",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/使用率/"
+            },
+            "properties": [
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 60
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "label_replace(erlang_host_cpu_usage_ratio{name=~\"$server\"} * 100, \"metric\", \"CPU使用率（%）\", \"\", \"\") or label_replace((1 - erlang_host_memory_available_bytes{name=~\"$server\"} / erlang_host_memory_total_bytes{name=~\"$server\"}) * 100, \"metric\", \"内存使用率（%）\", \"\", \"\") or label_replace(erlang_host_memory_total_bytes{name=~\"$server\"} / 1024 / 1024, \"metric\", \"内存总量（M）\", \"\", \"\") or label_replace(erlang_host_memory_available_bytes{name=~\"$server\"} / 1024 / 1024, \"metric\", \"内存可用（M）\", \"\", \"\") or label_replace((erlang_host_memory_total_bytes{name=~\"$server\"} - erlang_host_memory_available_bytes{name=~\"$server\"}) / 1024 / 1024, \"metric\", \"内存已用（M）\", \"\", \"\") or label_replace((1 - erlang_host_filesystem_available_bytes{name=~\"$server\"} / erlang_host_filesystem_size_bytes{name=~\"$server\"}) * 100, \"metric\", \"硬盘使用率（%）\", \"\", \"\") or label_replace(erlang_host_filesystem_available_bytes{name=~\"$server\"} / 1024 / 1024, \"metric\", \"硬盘可用（M）\", \"\", \"\") or label_replace(erlang_host_network_receive_bytes_per_second{name=~\"$server\"} / 1024, \"metric\", \"网络接收（KB/s）\", \"\", \"\") or label_replace(erlang_host_network_transmit_bytes_per_second{name=~\"$server\"} / 1024, \"metric\", \"网络发送（KB/s）\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "主机资源与IO",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "address": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "indexByName": {
+              "name": 0,
+              "metric": 1,
+              "Value": 2
+            },
+            "renameByName": {
+              "name": "服务器",
+              "metric": "指标",
+              "Value": "数值"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 7,
+      "panels": [],
+      "title": "异常详情（有异常时展开）",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "合并BEAM总内存、Run Queue以及Process、Atom、Port容量风险。表格为空表示没有节点达到配置的展示或告警阈值。BEAM内存按GiB显示，容量按百分比显示，Run Queue按相对在线调度器倍数显示。",
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 1,
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "label_replace(label_replace((erlang_vm_memory_bytes{name=~\"$server\"} / 1073741824) > on(server, name, node) (erlang_vm_memory_display_threshold_bytes{name=~\"$server\"} / 1073741824), \"risk_type\", \"BEAM内存（GiB）\", \"\", \"\"), \"hotspot_process\", \"不适用\", \"\", \"\") or label_replace(label_replace(min_over_time((erlang_vm_run_queue{name=~\"$server\"} / erlang_vm_schedulers_online{name=~\"$server\"})[10m:]) > on(server, name, node) erlang_vm_run_queue_display_multiplier{name=~\"$server\"}, \"risk_type\", \"Run Queue/调度器（倍）\", \"\", \"\"), \"hotspot_process\", \"待mlib_sys接口\", \"\", \"\") or label_replace(label_replace((erlang_vm_process_count{name=~\"$server\"} / erlang_vm_process_limit{name=~\"$server\"} > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio{name=~\"$server\"}) * 100, \"risk_type\", \"Process容量（%）\", \"\", \"\"), \"hotspot_process\", \"不适用\", \"\", \"\") or label_replace(label_replace((erlang_vm_atom_count{name=~\"$server\"} / erlang_vm_atom_limit{name=~\"$server\"} > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio{name=~\"$server\"}) * 100, \"risk_type\", \"Atom容量（%）\", \"\", \"\"), \"hotspot_process\", \"不适用\", \"\", \"\") or label_replace(label_replace((erlang_vm_port_count{name=~\"$server\"} / erlang_vm_port_limit{name=~\"$server\"} > on(server, name, node) erlang_vm_capacity_alert_threshold_ratio{name=~\"$server\"}) * 100, \"risk_type\", \"Port容量（%）\", \"\", \"\"), \"hotspot_process\", \"不适用\", \"\", \"\")",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Erlang节点异常",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "indexByName": {
+              "name": 0,
+              "node": 1,
+              "risk_type": 2,
+              "Value": 3,
+              "hotspot_process": 4
+            },
+            "renameByName": {
+              "name": "服务器",
+              "node": "节点",
+              "risk_type": "风险类型",
+              "Value": "当前值",
+              "hotspot_process": "热点进程"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "仅列出最大单进程消息队列超过配置阈值的节点，并展示对应进程信息。",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 4,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "(erlang_process_message_queue_max{name=~\"$server\"} > on(server, name, node) erlang_message_queue_threshold{name=~\"$server\"}) * on(server, name, node) group_left(pid, registered_name, initial_call, current_function) topk by (server, name, node) (1, erlang_process_message_queue_max_info{name=~\"$server\"})",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "消息队列异常进程",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "indexByName": {
+              "name": 0,
+              "node": 1,
+              "Value": 2,
+              "pid": 3,
+              "registered_name": 4,
+              "current_function": 5,
+              "initial_call": 6
+            },
+            "renameByName": {
+              "name": "服务器",
+              "node": "节点",
+              "Value": "最大队列",
+              "pid": "PID",
+              "registered_name": "进程名/注册名",
+              "current_function": "当前函数",
+              "initial_call": "初始函数"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "仅列出最大单进程内存超过配置阈值的节点，并展示对应进程信息。",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 209715200
+              }
+            ]
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 5,
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "(erlang_process_memory_max_bytes{name=~\"$server\"} > on(server, name, node) erlang_process_memory_threshold_bytes{name=~\"$server\"}) * on(server, name, node) group_left(pid, registered_name, initial_call, current_function) topk by (server, name, node) (1, erlang_process_memory_max_info{name=~\"$server\"})",
+          "format": "table",
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "高内存Erlang进程",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "instance": true,
+              "job": true,
+              "server": true
+            },
+            "indexByName": {
+              "name": 0,
+              "node": 1,
+              "Value": 2,
+              "pid": 3,
+              "registered_name": 4,
+              "current_function": 5,
+              "initial_call": 6
+            },
+            "renameByName": {
+              "name": "服务器",
+              "node": "节点",
+              "Value": "最大进程内存",
+              "pid": "PID",
+              "registered_name": "进程名/注册名",
+              "current_function": "当前函数",
+              "initial_call": "初始函数"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    }
+  ],
+  "refresh": "30m",
+  "schemaVersion": 41,
+  "tags": [
+    "erlang",
+    "ssh-exporter",
+    "alert-driven",
+    "qt-01"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "qt-01 - 101.35.19.137(game) (ga)",
+          "value": "101.35.19.137"
+        },
+        "hide": 2,
+        "includeAll": false,
+        "label": "目录-页面",
+        "multi": false,
+        "name": "server",
+        "options": [
+          {
+            "selected": true,
+            "text": "qt-01 - 101.35.19.137(game) (ga)",
+            "value": "101.35.19.137"
+          }
+        ],
+        "query": "qt-01 - 101.35.19.137(game) (ga) : 101.35.19.137",
+        "skipUrlSync": true,
+        "type": "custom"
+      }
+    ]
+  },
+  "timepicker": {
+    "refresh_intervals": ["30m"]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "101.35.19.137(game) (ga)",
+  "uid": "erlang-monitor-101-35-19-137",
+  "version": 1
+}

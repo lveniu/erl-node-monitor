@@ -1,0 +1,35 @@
+{
+    "workbench.localHistory.maxFileSize":  10240,
+    "erlang_ls.serverPath":  "D:\\server32-new\\trunk2\\.vscode\\erlang_ls\\erlang_ls",
+    "erlang_ls.logPath":  ".vscode\\erlang_ls\\server_log\\",
+    "erlang_ls.trace.server":  "off",
+    "erlang_ls.logLevel":  "error",
+    "git.ignoreLimitWarning":  true,
+    "specstory.cloudSync.enabled":  "never",
+    "claudeCode.environmentVariables": [
+        {
+            "name": "ANTHROPIC_AUTH_TOKEN",
+            "value": "b301b6dcf50d43688436932a79ba749a.J5XVfqzNrNr7g1To"
+        },
+        {
+            "name": "ANTHROPIC_BASE_URL",
+            "value": "https://open.bigmodel.cn/api/anthropic"
+        },
+        {
+            "name": "ANTHROPIC_MODEL",
+            "value": "glm-5.1"
+        }
+        // {
+        //     "name": "ANTHROPIC_AUTH_TOKEN",
+        //     "value": "sk-kimi-fbES69smL5x9CokvLjigq2ZLRfZgBb8MtB1g1uKP7UBk61GUC9hLeDowJK7CEF10"
+        // },
+        // {
+        //     "name": "ANTHROPIC_BASE_URL",
+        //     "value": "https://api.kimi.com/coding"
+        // },
+        // {
+        //     "name": "ANTHROPIC_MODEL",
+        //     "value": "kimi2.6"
+        // }
+    ]
+}

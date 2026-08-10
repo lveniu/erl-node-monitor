@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>服务器总览 + MNode 连接·组合静态原型</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111217;
+      --nav: #181b1f;
+      --panel: #181b1f;
+      --panel-deep: #14171b;
+      --border: #34373d;
+      --border-soft: #2a2d33;
+      --text: #d9d9d9;
+      --muted: #9da2a8;
+      --green: #56a64b;
+      --green-light: #73bf69;
+      --green-soft: rgba(86, 166, 75, .13);
+      --blue: #5794f2;
+      --cyan: #45b8cc;
+      --orange: #f2a93b;
+      --red: #e24d42;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); font: 14px/1.45 "Microsoft YaHei UI", "Noto Sans SC", sans-serif; }
+    button, select { font: inherit; }
+    .app { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 100vh; }
+
+    .sidebar { background: var(--nav); border-right: 1px solid var(--border); color: #c7c9cc; }
+    .grafana { height: 42px; padding: 0 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; font-weight: 600; }
+    .grafana-mark { color: #ff7a45; font: 800 22px Bahnschrift, sans-serif; }
+    .nav { padding: 10px 8px; }
+    .nav-section { margin: 2px 0; }
+    .nav-item { height: 37px; padding: 0 12px; display: flex; align-items: center; gap: 12px; border-radius: 2px; color: #b7babf; }
+    .nav-item::before { content: "◇"; color: #8e949c; width: 17px; text-align: center; }
+    .nav-item.active { background: #31343a; color: #fff; border-left: 4px solid #ff7a45; padding-left: 8px; }
+    .nav-item.active::before { content: ""; width: 17px; }
+    .nav-sub { margin-left: 38px; color: var(--muted); padding: 9px 10px; border-left: 1px solid #31343a; }
+    .nav-sub.current { color: var(--text); }
+
+    .workspace { min-width: 0; }
+    .global-top { height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px 0 30px; background: #171a1f; border-bottom: 1px solid var(--border); color: #c8cbd0; }
+    .crumb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .crumb span { color: #777e87; margin: 0 8px; }
+    .search { width: 312px; height: 31px; border: 1px solid var(--border); background: #111318; color: var(--muted); padding: 6px 10px; }
+    .content { max-width: 1380px; margin: 0 auto; padding: 10px 12px 28px; }
+
+    .toolbar { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 8px; }
+    .title { min-width: 0; margin-right: auto; }
+    .title h1 { margin: 0; font-size: 22px; line-height: 1.22; font-weight: 650; }
+    .title small { color: var(--muted); }
+    .control { min-height: 32px; border: 1px solid var(--border); border-radius: 4px; background: var(--panel); color: var(--text); padding: 6px 10px; }
+    select.control { width: 280px; }
+    button.control { cursor: pointer; font-weight: 600; }
+
+    .health { min-height: 64px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); border-radius: 6px; background: var(--panel); margin-bottom: 8px; }
+    .health-left { display: flex; align-items: center; gap: 10px; }
+    .health-icon { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: var(--green-light); background: var(--green-soft); font-weight: 800; }
+    .health strong, .health small { display: block; }
+    .health small { color: var(--muted); }
+    .last-sample { color: var(--muted); text-align: right; }
+    .last-sample strong { margin-top: 2px; color: var(--text); font: 600 14px Bahnschrift, sans-serif; }
+
+    .panel { border: 1px solid var(--border); border-radius: 6px; background: var(--panel); overflow: hidden; margin-bottom: 8px; }
+    .panel-head { min-height: 36px; padding: 7px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 650; }
+    .head-ok { color: var(--green-light); font-weight: 650; white-space: nowrap; }
+    .head-note { color: var(--muted); font-size: 12px; font-weight: 400; }
+
+    .gauges { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
+    .gauge { min-width: 0; min-height: 112px; padding: 12px 16px; display: flex; align-items: center; gap: 18px; background: var(--panel); }
+    .ring { --value: 0; --color: var(--blue); width: 88px; height: 88px; flex: 0 0 auto; border-radius: 50%; position: relative; display: grid; place-items: center; background: conic-gradient(var(--color) calc(var(--value) * 1%), #34373d 0); }
+    .ring::before { content: ""; position: absolute; inset: 9px; border-radius: 50%; background: var(--panel); }
+    .ring.cyan { --color: var(--cyan); }
+    .ring.green { --color: var(--green-light); }
+    .ring-value { position: relative; text-align: center; font: 600 20px/1 Bahnschrift, sans-serif; }
+    .ring-value small { display: block; margin-top: 5px; color: var(--muted); font: 10px "Microsoft YaHei UI", sans-serif; }
+    .gauge-copy strong { display: block; font-size: 15px; margin-bottom: 7px; }
+    .gauge-copy div { margin: 3px 0; font-variant-numeric: tabular-nums; }
+    .gauge-copy small { color: var(--muted); font-size: 14px; }
+
+    /* New mnode module: intentionally follows the existing compact Grafana panel language. */
+    .mnode-toolbar { min-height: 43px; padding: 6px 10px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--border-soft); background: var(--panel-deep); }
+    .view-tabs { display: flex; gap: 1px; margin-right: auto; padding: 2px; border: 1px solid var(--border); border-radius: 4px; background: #111318; }
+    .view-tab { min-height: 27px; padding: 4px 10px; border: 0; border-radius: 2px; background: transparent; color: var(--muted); font-size: 12px; }
+    .view-tab.active { color: var(--text); background: #34373d; font-weight: 600; }
+    .source-tag { border: 1px solid var(--border); border-radius: 99px; padding: 3px 8px; color: var(--muted); font: 11px Bahnschrift, sans-serif; }
+    .matrix-body { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--border); }
+    .matrix-group { min-width: 0; padding: 10px; background: var(--panel); }
+    .matrix-group.region-group { background: #1a1917; }
+    .matrix-heading { min-height: 27px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 12px; }
+    .matrix-heading strong { color: var(--text); font-weight: 600; }
+    .matrix-count { color: var(--green-light); font: 600 11px Bahnschrift, sans-serif; }
+    .matrix-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 7px; margin-top: 5px; }
+    .matrix-node { min-width: 0; min-height: 96px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; grid-template-rows: auto 1fr auto; column-gap: 11px; padding: 11px; border: 1px solid var(--border); border-radius: 4px; background: #171d18; position: relative; }
+    .matrix-node.region-node { background: #1d1b17; }
+    .matrix-node::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 2px; background: var(--green-light); }
+    .matrix-node.region-node::after { background: var(--orange); }
+    .dot-mark { grid-row: 1 / 4; width: 42px; height: 42px; align-self: center; display: grid; grid-template-columns: repeat(3, 4px); grid-auto-rows: 4px; place-content: center; gap: 4px; border: 1px solid rgba(115,191,105,.36); background: var(--green-soft); }
+    .dot-mark i { width: 4px; height: 4px; border-radius: 50%; background: var(--green-light); opacity: .35; }
+    .dot-mark i:nth-child(5) { opacity: 1; box-shadow: 0 0 7px rgba(115,191,105,.75); }
+    .region-node .dot-mark { border-color: rgba(242,169,59,.36); background: rgba(242,169,59,.1); }
+    .region-node .dot-mark i { background: var(--orange); }
+    .region-node .dot-mark i:nth-child(5) { box-shadow: 0 0 7px rgba(242,169,59,.65); }
+    .matrix-type { color: var(--muted); font: 10px Bahnschrift, sans-serif; letter-spacing: .06em; }
+    .matrix-state { color: var(--green-light); font-size: 11px; white-space: nowrap; }
+    .matrix-state::before { content: "●"; margin-right: 4px; }
+    .matrix-name { align-self: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 13px Bahnschrift, "Microsoft YaHei UI", sans-serif; }
+    .matrix-id { color: var(--muted); font: 11px Bahnschrift, sans-serif; }
+    .connection-caption { padding: 7px 10px; border-top: 1px solid var(--border-soft); color: var(--muted); font-size: 11px; background: var(--panel-deep); }
+    .connection-caption b { color: var(--green-light); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 920px; border-collapse: collapse; table-layout: fixed; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+    th { color: var(--muted); font-weight: 400; }
+    tr:last-child td { border-bottom: 0; }
+    .node-col { width: 25%; }
+    .status-col { width: 8%; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .online { color: var(--green-light); }
+    .online::before { content: "●"; margin-right: 5px; }
+    .pending { color: var(--muted); text-align: center; }
+    .connection-cell { width: 28%; white-space: normal; }
+    .connection-pair { display: grid; gap: 3px; }
+    .connection-entry { min-width: 0; display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 6px; color: #cfd6ce; font: 11px Bahnschrift, "Microsoft YaHei UI", sans-serif; }
+    .connection-entry b { padding: 1px 3px; border-radius: 2px; color: var(--green-light); background: var(--green-soft); text-align: center; font-size: 9px; }
+    .connection-entry.region b { color: var(--orange); background: rgba(242,169,59,.12); }
+    .connection-entry span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .connection-wait { color: var(--muted); font-size: 12px; }
+    .more td { padding: 0; text-align: center; color: var(--muted); background: var(--panel-deep); }
+    .node-expand { width: 100%; min-height: 36px; border: 0; background: transparent; color: inherit; cursor: pointer; font: inherit; transition: background-color .15s ease, color .15s ease; }
+    .node-expand:hover { color: var(--text); background: rgba(87,148,242,.08); }
+    .node-expand:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+    .node-expand-arrow { margin-left: 7px; color: var(--blue); font-size: 11px; }
+    .empty { min-height: 54px; display: grid; place-items: center; color: var(--muted); }
+
+    .prototype-note { margin-top: 9px; color: #777f88; font-size: 11px; text-align: right; }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 64px minmax(0, 1fr); }
+      .grafana span, .nav-item span, .nav-sub { display: none; }
+      .nav-item { justify-content: center; padding: 0; }
+      .nav-item.active { padding: 0; border-left: 0; border-bottom: 3px solid #ff7a45; }
+      .gauges { grid-template-columns: 1fr; }
+      .matrix-body { grid-template-columns: 1fr; }
+      .global-top { padding-left: 14px; }
+    }
+    @media (max-width: 650px) {
+      .app { display: block; }
+      .sidebar, .global-top { display: none; }
+      .content { padding: 8px; }
+      .toolbar { align-items: stretch; flex-wrap: wrap; }
+      .title { flex-basis: 100%; }
+      select.control { width: 100%; }
+      .toolbar select { flex: 1 1 100%; }
+      .health { align-items: flex-start; }
+      .last-sample { font-size: 11px; }
+      .mnode-toolbar { align-items: center; flex-wrap: wrap; }
+      .source-tag:last-child { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="Grafana 导航原型">
+      <div class="grafana"><b class="grafana-mark">G</b><span>Grafana</span></div>
+      <nav class="nav">
+        <div class="nav-item"><span>首页</span></div><div class="nav-item"><span>书签</span></div><div class="nav-item"><span>已加星标</span></div>
+        <div class="nav-item"><span>仪表板</span></div><div class="nav-item"><span>探索</span></div><div class="nav-item"><span>警报</span></div>
+        <div class="nav-item"><span>连接</span></div><div class="nav-item"><span>更多应用</span></div>
+        <div class="nav-item active"><span>Erlang Monitor Controls</span></div><div class="nav-sub current">Holmes 根因分析</div>
+        <div class="nav-item"><span>管理</span></div>
+      </nav>
+    </aside>
+
+    <div class="workspace">
+      <header class="global-top"><div class="crumb">首页 <span>›</span> 更多应用 <span>›</span> Erlang Monitor Controls</div><div class="search">⌕ 搜索...</div></header>
+      <main class="content">
+        <section class="toolbar">
+          <div class="title"><h1>101.34.55.142(game) (gc)</h1><small>101.34.55.142</small></div>
+          <select class="control" aria-label="目录-页面"><option>101.34.55.142(game) (gc)</option><option>101.35.19.137(game) (ga)</option><option>150.158.94.69(game) (gb)</option></select>
+          <button class="control">刷新采集</button><button class="control">自动 30m</button>
+        </section>
+
+        <section class="health">
+          <div class="health-left"><span class="health-icon">✓</span><div><strong>运行正常</strong><small>13/13 节点在线</small></div></div>
+          <div class="last-sample">最近采集<strong>2026/8/7 09:51:31</strong></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><span>资源水位</span><span class="head-ok">主机指标</span></div>
+          <div class="gauges">
+            <article class="gauge"><div class="ring" style="--value:44.5"><div class="ring-value">178.18%<small>CPU</small></div></div><div class="gauge-copy"><strong>CPU</strong><div>上限 1600%</div><small>16 逻辑核</small></div></article>
+            <article class="gauge"><div class="ring cyan" style="--value:47.42"><div class="ring-value">47.42%<small>内存</small></div></div><div class="gauge-copy"><strong>内存</strong><div>29.37 / 61.93 G</div><small>可用 32.57 G</small></div></article>
+            <article class="gauge"><div class="ring green" style="--value:43.2"><div class="ring-value">43.20%<small>硬盘</small></div></div><div class="gauge-copy"><strong>硬盘</strong><div>12.68 / 29.36 G</div><small>可用 16.68 G</small></div></article>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head"><span>Erlang 节点状态</span><span class="head-ok">13 / 13 在线</span></div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th class="node-col">节点</th><th class="status-col">状态</th><th class="num">进程总数</th><th class="num">内存（G）</th><th class="num">CPU比例</th><th class="connection-cell">节点连接</th><th class="pending">注册人数</th><th class="pending">在线人数</th></tr></thead>
+              <tbody>
+                <tr><td>wl_ssjj_1@172.19.32.194</td><td><span class="online">在线</span></td><td class="num">308</td><td class="num">0.16 G</td><td class="num">0.13%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr><td>wl_ssjj_100007@172.19.32.194</td><td><span class="online">在线</span></td><td class="num">302</td><td class="num">0.83 G</td><td class="num">1.08%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr><td>wl_ssjj_100008@172.19.32.194</td><td><span class="online">在线</span></td><td class="num">282</td><td class="num">1.17 G</td><td class="num">3.29%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr><td>wl_ssjj_1501@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">917</td><td class="num">1.74 G</td><td class="num">4.70%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr><td>wl_ssjj_1814@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">959</td><td class="num">1.87 G</td><td class="num">6.04%</td><td class="connection-cell"><div class="connection-pair"><span class="connection-entry" title="wl_ssjj_1@172.19.33.98"><b>C8</b><span>801000001 · wl_ssjj_1</span></span><span class="connection-entry region" title="wl_ssjj_100005@172.19.33.104"><b>C9</b><span>901100005 · wl_ssjj_100005</span></span></div></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr><td>wl_ssjj_1816@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">911</td><td class="num">0.86 G</td><td class="num">5.76%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1817@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">903</td><td class="num">0.92 G</td><td class="num">4.91%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1818@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">886</td><td class="num">0.79 G</td><td class="num">4.36%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1819@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">921</td><td class="num">1.02 G</td><td class="num">5.13%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1820@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">899</td><td class="num">0.88 G</td><td class="num">4.72%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1821@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">934</td><td class="num">1.09 G</td><td class="num">5.45%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1822@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">908</td><td class="num">0.95 G</td><td class="num">4.83%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="node-extra" hidden><td>wl_ssjj_1823@127.0.0.1</td><td><span class="online">在线</span></td><td class="num">896</td><td class="num">0.84 G</td><td class="num">4.58%</td><td class="connection-cell"><span class="connection-wait">待采集</span></td><td class="pending">待接口</td><td class="pending">待接口</td></tr>
+                <tr class="more"><td colspan="8"><button class="node-expand" type="button" aria-expanded="false"><span class="node-expand-label">其余 7 个节点：7 在线</span><span class="node-expand-arrow" aria-hidden="true">▼</span></button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel"><div class="panel-head"><span>异常详情</span><span class="head-ok">当前无异常</span></div><div class="empty">当前没有 firing 或 pending 告警</div></section>
+        <div class="prototype-note">静态组合原型·未接入 Prometheus / Grafana</div>
+      </main>
+    </div>
+  </div>
+  <script>
+    const expandButton = document.querySelector('.node-expand');
+    const expandLabel = document.querySelector('.node-expand-label');
+    const expandArrow = document.querySelector('.node-expand-arrow');
+    const extraRows = [...document.querySelectorAll('.node-extra')];
+    expandButton.addEventListener('click', () => {
+      const expanded = expandButton.getAttribute('aria-expanded') === 'true';
+      expandButton.setAttribute('aria-expanded', String(!expanded));
+      extraRows.forEach((row) => { row.hidden = expanded; });
+      expandLabel.textContent = expanded ? '其余 7 个节点：7 在线' : '收起节点列表 · 共 13 个节点';
+      expandArrow.textContent = expanded ? '▼' : '▲';
+    });
+  </script>
+</body>
+</html>

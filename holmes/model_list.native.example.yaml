@@ -1,0 +1,6 @@
+# Copy to the Git-ignored holmes/model_list.local.yaml on the monitoring host.
+# The API key remains in secrets/glm_api_key and is injected by run-holmes.sh.
+glm:
+  model: anthropic/glm-5.1
+  api_base: https://open.bigmodel.cn/api/anthropic
+  api_key: "{{ env.GLM_API_KEY }}"

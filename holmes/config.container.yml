@@ -1,0 +1,18 @@
+# HolmesGPT 0.38.1 container configuration. Only the read-only Prometheus
+# toolset and the project skill are enabled for this deployment.
+max_steps: 20
+custom_skill_paths:
+  - /etc/holmes/project-skills
+toolsets:
+  prometheus/metrics:
+    enabled: true
+    subtype: prometheus
+    config:
+      prometheus_url: http://prometheus:20901
+      tool_calls_return_data: true
+  bash:
+    enabled: false
+  kubernetes/core:
+    enabled: false
+  internet:
+    enabled: false

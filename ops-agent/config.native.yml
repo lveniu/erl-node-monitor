@@ -1,0 +1,18 @@
+model:
+  protocol: anthropic
+  api_base: https://open.bigmodel.cn/api/anthropic
+  model: glm-5.1
+  api_key_env: OPS_AGENT_MODEL_API_KEY
+  timeout: 90s
+
+skills_dir: /data/node_monitor/ops-agent/skills
+local_workdir: /data/node_monitor
+allow_local_shell: false
+
+limits:
+  max_steps: 1000
+  task_timeout: 30m
+  command_timeout: 30m
+  max_command_bytes: 4096
+  max_output_bytes: 65536
+  task_ttl: 30m

@@ -1,0 +1,16 @@
+monitoring_nodes:
+  - address: 192.168.100.22
+    role: primary
+    deploy_now: false
+    ssh_port: 61618
+    ssh_port_must_be_confirmed: true
+    services: [prometheus, grafana, alertmanager, erlang-monitor]
+  - address: 192.168.100.24
+    role: standby
+    deploy_now: false
+    ssh_port: 61618
+    ssh_port_must_be_confirmed: true
+    services: []
+
+# 当前文件仅记录规划，不会被Compose自动执行。
+# .22/.24的SSH端口、系统版本、磁盘、Docker/Podman和防火墙均须部署前只读确认。

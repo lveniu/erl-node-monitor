@@ -1,0 +1,29 @@
+[Unit]
+Description=Erlang Monitor Operations Agent
+Wants=network-online.target erlang-monitor-exporter.service
+After=network-online.target erlang-monitor-exporter.service
+
+[Service]
+Type=simple
+User=erlang-monitor
+Group=erlang-monitor
+WorkingDirectory=/data/node_monitor
+UMask=0027
+Environment=SSH_AUTH_SOCK=/run/erlang-monitor-ssh-agent/agent.sock
+Environment=OPS_AGENT_MODEL_API_KEY_FILE=/data/node_monitor/secrets/glm_api_key
+Environment=OPS_AGENT_TOOL_API_TOKEN_FILE=/data/node_monitor/secrets/holmes_tool_api_token
+ExecStartPre=/usr/bin/test -S /run/erlang-monitor-ssh-agent/agent.sock
+ExecStartPre=/usr/bin/ssh-add -l
+ExecStartPre=/opt/erlang-monitor/bin/ops-agent -config /data/node_monitor/ops-agent/config.native.yml -servers /data/node_monitor/config/servers.native.yml -check-config
+ExecStart=/opt/erlang-monitor/bin/ops-agent -config /data/node_monitor/ops-agent/config.native.yml -servers /data/node_monitor/config/servers.native.yml -listen 127.0.0.1:20906
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=30
+TimeoutStopSec=20
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

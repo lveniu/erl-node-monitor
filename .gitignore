@@ -1,0 +1,26 @@
+.env
+bin/
+.runtime/
+data/
+config/servers.yml
+config/servers.local.yml
+# 所有密钥、私钥、口令、Token、Webhook 都不允许进入仓库
+secrets/
+!secrets/.gitkeep
+!secrets/README.md
+logs/
+*.exe
+*.pem
+*.key
+id_rsa
+id_*
+*.ppk
+erl_crash.dump
+.codex/
+# Linux 离线运行时压缩包体积超过 GitHub 限制，由 linux/install-runtime.sh 在目标机器上下载
+linux/packages/*.tar.gz
+linux/packages/*.tgz
+holmes/model_list.local.yaml
+holmes/gateway.local.yml
+holmes/*.secret
+ops-agent/config.local.yml

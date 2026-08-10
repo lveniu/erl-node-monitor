@@ -1,0 +1,18 @@
+holmes_version: "0.38.1"
+holmes_url: http://holmes:20905
+prometheus_url: http://prometheus:20901
+
+models:
+  glm: {display_name: GLM, enabled: true}
+  kimi: {display_name: Kimi, enabled: true}
+
+limits:
+  max_range: 24h
+  investigation_timeout: 5m
+  tool_timeout: 45s
+  max_tool_calls: 12
+  max_output_bytes: 262144
+  max_sessions: 100
+  session_retention: 168h
+  max_user_running: 1
+  max_global_running: 2

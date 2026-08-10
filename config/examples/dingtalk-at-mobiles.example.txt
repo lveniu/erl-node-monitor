@@ -1,0 +1,2 @@
+# 每行一个需要@的手机号；正式内容请保存到 secrets/dingtalk_at_mobiles
+13800000000

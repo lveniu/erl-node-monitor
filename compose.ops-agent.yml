@@ -1,0 +1,48 @@
+# Optional single-task operations Agent. The normal monitoring stack remains
+# independent and continues running if this profile is stopped.
+services:
+  erlang-ops-agent:
+    profiles: ["ops-agent"]
+    build:
+      context: .
+      target: ops-agent
+    restart: unless-stopped
+    command: ["-config", "/etc/erlang-monitor/ops-agent.yml", "-servers", "/etc/erlang-monitor/servers.yml", "-listen", "0.0.0.0:20906"]
+    environment:
+      OPS_AGENT_MODEL_API_KEY_FILE: /run/secrets/ops_agent_model_api_key
+      OPS_AGENT_TOOL_API_TOKEN_FILE: /run/secrets/ops_agent_tool_api_token
+      TZ: Asia/Shanghai
+    volumes:
+      - ./ops-agent/config.container.yml:/etc/erlang-monitor/ops-agent.yml:ro
+      - ./ops-agent/skills:/etc/erlang-monitor/skills:ro
+      - ./config/servers.yml:/etc/erlang-monitor/servers.yml:ro
+    secrets:
+      - ops_agent_model_api_key
+      - ops_agent_tool_api_token
+      - monitor_private_key
+      - monitor_private_key_passphrase
+    ports:
+      - "${MONITOR_BIND_IP:-127.0.0.1}:20906:20906"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:20906/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  grafana:
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        export OPS_AGENT_TOOL_API_TOKEN="$$(cat /run/secrets/ops_agent_tool_api_token)";
+        exec /run.sh
+    secrets:
+      - grafana_admin_password
+      - ops_agent_tool_api_token
+
+secrets:
+  ops_agent_model_api_key:
+    file: ./secrets/ops_agent_model_api_key
+  ops_agent_tool_api_token:
+    file: ./secrets/ops_agent_tool_api_token
+

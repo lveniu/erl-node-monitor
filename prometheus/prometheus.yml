@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 1m
+  evaluation_interval: 1m
+  external_labels:
+    monitor_cluster: erlang-monitor-primary
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: [alertmanager:20902]
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [prometheus:20901]
+
+  - job_name: erlang-exporter
+    static_configs:
+      - targets: [erlang-exporter:20903]
+
+  - job_name: holmes-gateway
+    scrape_interval: 30s
+    static_configs:
+      - targets: [holmes-gateway:20904]

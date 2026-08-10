@@ -1,0 +1,114 @@
+{
+  "type": "app",
+  "name": "Erlang Monitor Controls",
+  "id": "erlang-monitor-controls-app",
+  "preload": true,
+  "info": {
+    "description": "Connects per-server collection and the single-task Erlang operations Agent.",
+    "author": {
+      "name": "Erlang Monitor"
+    },
+    "keywords": ["erlang", "monitoring", "refresh"],
+    "logos": {},
+    "links": [],
+    "screenshots": [],
+    "version": "1.3.7",
+    "updated": "2026-08-10"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=12.1.0",
+    "plugins": []
+  },
+  "includes": [
+    {
+      "type": "page",
+      "name": "Erlang 运行总览",
+      "path": "/a/erlang-monitor-controls-app/overview",
+      "role": "Viewer",
+      "addToNav": false,
+      "defaultNav": false
+    },
+    {
+      "type": "page",
+      "name": "运维 Agent",
+      "path": "/a/erlang-monitor-controls-app/ops-agent",
+      "role": "Editor",
+      "addToNav": true,
+      "defaultNav": false
+    }
+  ],
+  "routes": [
+    {
+      "path": "collect",
+      "method": "POST",
+      "url": "{{.JsonData.collectorUrl}}/collect",
+      "reqRole": "Viewer"
+    },
+    {
+      "path": "status",
+      "method": "GET",
+      "url": "{{.JsonData.collectorUrl}}/status",
+      "reqRole": "Viewer"
+    },
+    {
+      "path": "config-status",
+      "method": "GET",
+      "url": "{{.JsonData.collectorUrl}}/config/status",
+      "reqRole": "Viewer"
+    },
+    {
+      "path": "ops-agent-health",
+      "method": "GET",
+      "url": "{{.JsonData.opsAgentUrl}}/healthz",
+      "reqRole": "Viewer"
+    },
+    {
+      "path": "ops-agent",
+      "method": "GET",
+      "url": "{{.JsonData.opsAgentUrl}}",
+      "reqRole": "Editor",
+      "headers": [
+        {
+          "name": "Authorization",
+          "content": "Bearer {{.SecureJsonData.opsAgentToolToken}}"
+        },
+        {
+          "name": "X-Erlang-Monitor-Role",
+          "content": "Editor"
+        }
+      ]
+    },
+    {
+      "path": "ops-agent",
+      "method": "POST",
+      "url": "{{.JsonData.opsAgentUrl}}",
+      "reqRole": "Editor",
+      "headers": [
+        {
+          "name": "Authorization",
+          "content": "Bearer {{.SecureJsonData.opsAgentToolToken}}"
+        },
+        {
+          "name": "X-Erlang-Monitor-Role",
+          "content": "Editor"
+        }
+      ]
+    },
+    {
+      "path": "ops-agent-admin",
+      "method": "POST",
+      "url": "{{.JsonData.opsAgentUrl}}",
+      "reqRole": "Admin",
+      "headers": [
+        {
+          "name": "Authorization",
+          "content": "Bearer {{.SecureJsonData.opsAgentToolToken}}"
+        },
+        {
+          "name": "X-Erlang-Monitor-Role",
+          "content": "Admin"
+        }
+      ]
+    }
+  ]
+}

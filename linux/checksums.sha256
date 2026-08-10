@@ -1,0 +1,9 @@
+e811827af26d822afb09a4f28314f61b618b12cff5369835a67f674d8b46f39a  packages/prometheus-3.5.0.linux-amd64.tar.gz
+5ac7ab5e4b8ee5ce4d8fb0988f9cb275efcc3f181b4b408179fafee121693311  packages/alertmanager-0.28.1.linux-amd64.tar.gz
+69923cf95824008a6a7529f242295ecc2bc6b1dc4e5142c889971e88407d8712  packages/grafana-12.1.0.linux-amd64.tar.gz
+692ea29b53b72566a5b9dada1732b4f78d5ac8a0c7cb4db5dfa8bedef4b5a009  bin/erlang-exporter
+ef19528c4619c5e805d2b7a1320855a6b66bda2d12852cab0ec979beaa06cffa  bin/ops-agent
+6e162dc65624dabaf9f814a1aa63cc660897f9d8f05ebbfe85392f0bfbcbe0ab  bin/holmes-gateway
+f6a760090f336dc1df1ee3595bcbbf81f4a0c5214ee9385240f24af32eba72fd  packages/cpython-3.11.15+20260804-x86_64-unknown-linux-gnu-install_only_stripped.tgz
+ce9fde1b8d7672fef5a1f0e146467ddfacffcb67df3cd581c63d0e23a45bf0fa  packages/holmesgpt-0.38.1-native-centos7.tgz
+49e2f3cc40add275f380363b143d2ae100435c00d2acde6a8e77ba6d26b8915f  packages/holmes-wheels-0.38.1-centos7-x86_64.tgz

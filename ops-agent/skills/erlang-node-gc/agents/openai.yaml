@@ -1,0 +1,4 @@
+interface:
+  display_name: "Erlang 节点 GC"
+  short_description: "指定节点或逐服检查并对符合条件的内网 Erlang 节点执行受控 GC"
+  default_prompt: "Use $erlang-node-gc to inspect the specified Erlang service, or every discovered service on the current internal server when none is specified, garbage-collect only qualifying nodes, and verify each result."

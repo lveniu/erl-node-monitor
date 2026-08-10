@@ -1,0 +1,187 @@
+name: erlang-monitor
+
+services:
+  erlang-exporter:
+    build:
+      context: .
+      target: exporter
+    restart: unless-stopped
+    command: ["-config", "/etc/erlang-monitor/servers.yml", "-listen", ":20903", "-status-file", "/var/lib/erlang-monitor/exporter-status.json", "-dingtalk-status-file", "/var/lib/erlang-monitor/dingtalk-status.json"]
+    environment:
+      DINGTALK_WEBHOOK_URL_FILE: /run/secrets/dingtalk_webhook_url
+      DINGTALK_SECRET_FILE: /run/secrets/dingtalk_secret
+      TZ: Asia/Shanghai
+    volumes:
+      - ./config/servers.yml:/etc/erlang-monitor/servers.yml:ro
+      - exporter-data:/var/lib/erlang-monitor
+    secrets:
+      - monitor_private_key
+      - monitor_private_key_passphrase
+      - dingtalk_webhook_url
+      - dingtalk_secret
+    ports:
+      - "127.0.0.1:20903:20903"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:20903/healthz"]
+      interval: 1m
+      timeout: 5s
+      retries: 3
+
+  holmes:
+    profiles: ["holmes"]
+    image: robustadev/holmes:0.38.1@sha256:a9350bb400df457853a0acb67f63cb57fbfbfd697eccdf9330be4e0b20375944
+    restart: unless-stopped
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        export HOLMES_API_KEY="$$(cat /run/secrets/holmes_api_key)";
+        export GLM_API_KEY="$$(cat /run/secrets/glm_api_key)";
+        export KIMI_API_KEY="$$(cat /run/secrets/kimi_api_key)";
+        exec python -u server.py
+    environment:
+      HOLMES_CONFIG_PATH: /etc/holmes/project/config.yml
+      MODEL_LIST_FILE_LOCATION: /etc/holmes/project/model_list.yaml
+      HOLMES_HOST: "0.0.0.0"
+      HOLMES_PORT: "20905"
+      HOLMES_TOOL_RESULT_STORAGE_ENABLED: "false"
+      ENABLE_JSON_LOGS_FORMAT: "true"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./holmes/config.container.yml:/etc/holmes/project/config.yml:ro
+      - ./holmes/model_list.local.yaml:/etc/holmes/project/model_list.yaml:ro
+      - ./holmes/skills:/etc/holmes/project-skills:ro
+    secrets:
+      - holmes_api_key
+      - glm_api_key
+      - kimi_api_key
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:20905/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  holmes-gateway:
+    profiles: ["holmes"]
+    build:
+      context: .
+      target: gateway
+    restart: unless-stopped
+    command: ["-config", "/etc/erlang-monitor/holmes-gateway.yml", "-servers", "/etc/erlang-monitor/servers.yml", "-listen", "0.0.0.0:20904", "-data-dir", "/var/lib/erlang-monitor/holmes"]
+    environment:
+      HOLMES_API_KEY_FILE: /run/secrets/holmes_api_key
+      HOLMES_TOOL_API_TOKEN_FILE: /run/secrets/holmes_tool_api_token
+      TZ: Asia/Shanghai
+    volumes:
+      - ./holmes/gateway.container.yml:/etc/erlang-monitor/holmes-gateway.yml:ro
+      - ./config/servers.yml:/etc/erlang-monitor/servers.yml:ro
+      - holmes-gateway-data:/var/lib/erlang-monitor/holmes
+    secrets:
+      - holmes_api_key
+      - holmes_tool_api_token
+      - monitor_private_key
+      - monitor_private_key_passphrase
+    ports:
+      - "${MONITOR_BIND_IP:-127.0.0.1}:20904:20904"
+    depends_on:
+      holmes:
+        condition: service_started
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:20904/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.listen-address=:20901
+      - --web.enable-lifecycle
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "${MONITOR_BIND_IP:-127.0.0.1}:20901:20901"
+    depends_on:
+      erlang-exporter:
+        condition: service_started
+      alertmanager:
+        condition: service_started
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    restart: unless-stopped
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager", "--web.listen-address=:20902"]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      - "${MONITOR_BIND_IP:-127.0.0.1}:20902:20902"
+    depends_on:
+      erlang-exporter:
+        condition: service_started
+
+  grafana:
+    image: grafana/grafana:12.1.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_SERVER_HTTP_PORT: "20900"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_DEFAULT_LANGUAGE: zh-Hans
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DATAPROXY_SEND_USER_HEADER: "true"
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: erlang-monitor-controls-app
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      TZ: Asia/Shanghai
+    secrets:
+      - grafana_admin_password
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./grafana/dashboards-internal:/var/lib/grafana/dashboards-internal:ro
+      - ./grafana/dashboards-qt05-internal:/var/lib/grafana/dashboards-qt05-internal:ro
+      - ./grafana/dashboards-qt07-internal:/var/lib/grafana/dashboards-qt07-internal:ro
+      - ./grafana/plugins:/var/lib/grafana/plugins:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${MONITOR_BIND_IP:-127.0.0.1}:20900:20900"
+    depends_on:
+      prometheus:
+        condition: service_started
+
+secrets:
+  monitor_private_key:
+    file: ./secrets/monitor_private_key
+  monitor_private_key_passphrase:
+    file: ./secrets/monitor_private_key_passphrase
+  dingtalk_webhook_url:
+    file: ./secrets/dingtalk_webhook_url
+  dingtalk_secret:
+    file: ./secrets/dingtalk_secret
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password
+  holmes_api_key:
+    file: ./secrets/holmes_api_key
+  holmes_tool_api_token:
+    file: ./secrets/holmes_tool_api_token
+  glm_api_key:
+    file: ./secrets/glm_api_key
+  kimi_api_key:
+    file: ./secrets/kimi_api_key
+
+volumes:
+  exporter-data:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  holmes-gateway-data:

@@ -1,0 +1,23 @@
+[Unit]
+Description=Erlang Monitor Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=erlang-monitor
+Group=erlang-monitor
+WorkingDirectory=/data/node_monitor
+UMask=0027
+Environment=SSH_AUTH_SOCK=/run/erlang-monitor-ssh-agent/agent.sock
+ExecStartPre=/usr/bin/test -s /data/node_monitor/config/servers.native.yml
+ExecStartPre=/usr/bin/test -S /run/erlang-monitor-ssh-agent/agent.sock
+ExecStartPre=/usr/bin/ssh-add -l
+ExecStart=/data/node_monitor/linux/run-exporter.sh -config /data/node_monitor/config/servers.native.yml -listen 127.0.0.1:20903 -status-file /data/node_monitor/data/exporter-status.json -dingtalk-status-file /data/node_monitor/data/dingtalk-status.json
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

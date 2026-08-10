@@ -1,0 +1,2 @@
+# 每行一个需要@的钉钉用户ID；正式内容请保存到 secrets/dingtalk_at_user_ids
+manager-user-id

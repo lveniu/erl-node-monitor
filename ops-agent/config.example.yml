@@ -1,0 +1,18 @@
+model:
+  # OpenAI-compatible endpoint. Keep the API key in the environment only.
+  api_base: https://api.openai.com/v1
+  model: gpt-4o-mini
+  api_key_env: OPS_AGENT_MODEL_API_KEY
+  timeout: 90s
+
+skills_dir: skills
+local_workdir: .
+allow_local_shell: false
+
+limits:
+  max_steps: 1000
+  task_timeout: 30m
+  command_timeout: 30m
+  max_command_bytes: 4096
+  max_output_bytes: 65536
+  task_ttl: 30m
