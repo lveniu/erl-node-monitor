@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=/data/node_monitor
-RUNTIME_ROOT=/opt/erlang-monitor
+PROJECT_ROOT=/home/qt/node_monitor
+RUNTIME_ROOT=${PROJECT_ROOT}/runtime
 PASSWORD_FILE=${PROJECT_ROOT}/secrets/grafana_admin_password
 OPS_AGENT_TOOL_TOKEN_FILE=${PROJECT_ROOT}/secrets/ops_agent_tool_api_token
 

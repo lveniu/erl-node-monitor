@@ -1,7 +1,7 @@
 {
   "name": "erlang-monitor-controls-app",
   "private": true,
-  "version": "1.3.7",
+  "version": "1.3.19",
   "type": "module",
   "scripts": {
     "build": "npx --yes rollup@4.46.2 src/module.js --format system --external react --external @grafana/data --external @grafana/runtime --file module.js",

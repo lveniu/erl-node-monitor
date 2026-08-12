@@ -5,8 +5,8 @@ model:
   api_key_env: OPS_AGENT_MODEL_API_KEY
   timeout: 90s
 
-skills_dir: /data/node_monitor/ops-agent/skills
-local_workdir: /data/node_monitor
+skills_dir: /home/qt/node_monitor/ops-agent/skills
+local_workdir: /home/qt/node_monitor
 allow_local_shell: false
 
 limits:

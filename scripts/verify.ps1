@@ -82,7 +82,7 @@ try {
             throw "Windows launcher duplicates shared Grafana setting: $duplicatedSetting"
         }
     }
-    foreach ($platformSpecificMarker in @('/data/node_monitor', 'admin_password', 'root_url =', 'domain =')) {
+    foreach ($platformSpecificMarker in @('/home/qt/node_monitor', 'admin_password', 'root_url =', 'domain =')) {
         if ($nativeGrafanaConfigText.Contains($platformSpecificMarker)) {
             throw "Shared native Grafana config contains platform or Secret-specific setting: $platformSpecificMarker"
         }
@@ -99,7 +99,7 @@ try {
     if ($localServersText -match '(?m)^\s+(?:ssh_key_file|private_key_file|private_key_passphrase_file):\s*["'']?[A-Za-z]:[/\\]') {
         throw "Shared server config contains an active Windows-absolute SSH credential path"
     }
-    if (-not $localServersText.Contains('ssh_key_file: "secrets/ssh/ssjj_identity.pub"')) {
+    if (-not $localServersText.Contains('ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"')) {
         throw "Shared server config must select the external SSH Agent identity by project-relative public-key path"
     }
 

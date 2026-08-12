@@ -38,7 +38,7 @@ servers:
     username: admin
     use_ssh_agent: true
     # 仅从文件提取公钥身份，用于锁定 Agent 中已解锁的同一把密钥；不直接读取私钥登录。
-    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"
     # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
     host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
     filesystem_path: /
@@ -52,7 +52,7 @@ servers:
     username: admin
     use_ssh_agent: true
     # 与142相同的SSH Agent密钥。
-    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"
     # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
     host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
     filesystem_path: /
@@ -67,7 +67,7 @@ servers:
     address: 150.158.94.69:43999
     username: admin
     use_ssh_agent: true
-    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"
     # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
     host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
     filesystem_path: /
@@ -80,7 +80,7 @@ servers:
     address: 162.14.141.52:43999
     username: admin
     use_ssh_agent: true
-    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"
     # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
     host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
     filesystem_path: /
@@ -93,7 +93,7 @@ servers:
     address: 49.234.183.253:43999
     username: admin
     use_ssh_agent: true
-    ssh_key_file: "secrets/ssh/ssjj_identity.pub"
+    ssh_key_file: "secrets/ssh/qthy@liujinxin.pub"
     # 固定当前 SSH 实际协商的 ECDSA 主机指纹。
     host_key_sha256: "SHA256:2rmw09tWY2ckvZB1huInwTnE4VinHAoQpipxUmfX+xI"
     filesystem_path: /

@@ -7,14 +7,44 @@ if [[ ${EUID} -ne 0 ]]; then
 fi
 
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-INSTALL_ROOT=/opt/erlang-monitor
-PROJECT_ROOT=/data/node_monitor
+PROJECT_ROOT=/home/qt/node_monitor
+INSTALL_ROOT=${PROJECT_ROOT}/runtime
 CONFIG_ROOT=${PROJECT_ROOT}/config
 DATA_ROOT=${PROJECT_ROOT}/data
 SERVICE_USER=erlang-monitor
+SERVICE_HOME=${PROJECT_ROOT}/service-home
 PROMETHEUS_VERSION=3.5.0
 ALERTMANAGER_VERSION=0.28.1
 GRAFANA_VERSION=12.1.0
+
+set_selinux_fcontext() {
+  local type=$1
+  local pattern=$2
+
+  if ! semanage fcontext -a -t "${type}" "${pattern}" 2>/dev/null; then
+    semanage fcontext -m -t "${type}" "${pattern}"
+  fi
+}
+
+configure_selinux_contexts() {
+  if ! command -v selinuxenabled >/dev/null 2>&1 || ! selinuxenabled; then
+    return
+  fi
+  for command_name in semanage restorecon; do
+    if ! command -v "${command_name}" >/dev/null 2>&1; then
+      echo "SELinux is enabled but required command is missing: ${command_name}" >&2
+      exit 1
+    fi
+  done
+
+  set_selinux_fcontext usr_t '/home/qt/node_monitor(/.*)?'
+  set_selinux_fcontext bin_t '/home/qt/node_monitor/runtime(/.*)?'
+  set_selinux_fcontext bin_t '/home/qt/node_monitor/linux/.*\.sh'
+  set_selinux_fcontext var_lib_t '/home/qt/node_monitor/data(/.*)?'
+  set_selinux_fcontext var_lib_t '/home/qt/node_monitor/service-home(/.*)?'
+  set_selinux_fcontext etc_t '/home/qt/node_monitor/secrets(/.*)?'
+  restorecon -RF "${PROJECT_ROOT}"
+}
 
 if [[ -f "${SCRIPT_DIR}/packages/prometheus-${PROMETHEUS_VERSION}.linux-amd64.tar.gz" ]]; then
   PACKAGE_ROOT=${SCRIPT_DIR}
@@ -56,7 +86,9 @@ grep '  bin/ops-agent$' "${SCRIPT_DIR}/checksums.sha256" | \
   (cd "${OPS_AGENT_ROOT}" && sha256sum --check -)
 
 if ! getent passwd "${SERVICE_USER}" >/dev/null; then
-  useradd --system --home-dir /var/lib/erlang-monitor --shell /sbin/nologin --no-create-home "${SERVICE_USER}"
+  useradd --system --home-dir "${SERVICE_HOME}" --shell /sbin/nologin --no-create-home "${SERVICE_USER}"
+elif [[ "$(getent passwd "${SERVICE_USER}" | cut -d: -f6)" != "${SERVICE_HOME}" ]]; then
+  usermod --home "${SERVICE_HOME}" "${SERVICE_USER}"
 fi
 
 install -d -o root -g root -m 0755 \
@@ -71,11 +103,14 @@ install -d -o root -g "${SERVICE_USER}" -m 0750 \
   "${PROJECT_ROOT}/secrets" \
   "${PROJECT_ROOT}/secrets/ssh"
 install -d -o "${SERVICE_USER}" -g "${SERVICE_USER}" -m 0750 \
+  "${SERVICE_HOME}" \
   "${DATA_ROOT}" \
   "${DATA_ROOT}/prometheus" \
   "${DATA_ROOT}/alertmanager" \
   "${DATA_ROOT}/grafana" \
   "${DATA_ROOT}/logs"
+
+configure_selinux_contexts
 
 install_archive() {
   local archive=$1

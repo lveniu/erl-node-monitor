@@ -7,9 +7,9 @@ After=network-online.target
 Type=simple
 User=erlang-monitor
 Group=erlang-monitor
-WorkingDirectory=/data/node_monitor/alertmanager
+WorkingDirectory=/home/qt/node_monitor/alertmanager
 UMask=0027
-ExecStart=/opt/erlang-monitor/alertmanager/alertmanager --config.file=/data/node_monitor/alertmanager/alertmanager.local.yml --storage.path=/data/node_monitor/data/alertmanager --web.listen-address=127.0.0.1:20902
+ExecStart=/home/qt/node_monitor/runtime/alertmanager/alertmanager --config.file=/home/qt/node_monitor/alertmanager/alertmanager.local.yml --storage.path=/home/qt/node_monitor/data/alertmanager --web.listen-address=127.0.0.1:20902
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true

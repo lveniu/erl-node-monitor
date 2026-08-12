@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=/data/node_monitor
+PROJECT_ROOT=/home/qt/node_monitor
 SVN_USERNAME=qt01_server_rebuild
-SVN_PASSWORD_FILE=/data/save/${SVN_USERNAME}
+SVN_BIN=/home/tools/subversion/bin/svn
+SVN_PASSWORD_FILE=/home/save/${SVN_USERNAME}
 SCRIPT_PATH=${PROJECT_ROOT}/linux/update-and-restart.sh
 LOCK_FILE=/run/lock/node-monitor-update-and-restart.lock
 SSH_AGENT_USER=erlang-monitor
 SSH_AGENT_DIR=/run/erlang-monitor-ssh-agent
 SSH_AUTH_SOCK_PATH=${SSH_AGENT_DIR}/agent.sock
 SSH_AGENT_PID_FILE=${SSH_AGENT_DIR}/agent.pid
-SSH_PRIVATE_KEY=${PROJECT_ROOT}/secrets/ssh/ssjj_identity
-SSH_PUBLIC_KEY=${PROJECT_ROOT}/secrets/ssh/ssjj_identity.pub
-SSH_AGENT_KEY_COPY=${SSH_AGENT_DIR}/ssjj_identity
+SSH_PRIVATE_KEY=${PROJECT_ROOT}/secrets/ssh/qthy@liujinxin
+SSH_PUBLIC_KEY=${PROJECT_ROOT}/secrets/ssh/qthy@liujinxin.pub
+SSH_AGENT_KEY_COPY=${SSH_AGENT_DIR}/qthy@liujinxin
 
 SERVICES=(
   erlang-monitor-exporter.service
@@ -24,9 +25,9 @@ SERVICES=(
 
 usage() {
   cat <<'EOF'
-Usage: sudo bash /data/node_monitor/linux/update-and-restart.sh [--revision REVISION]
+Usage: sudo bash /home/qt/node_monitor/linux/update-and-restart.sh [--revision REVISION]
 
-Updates the /data/node_monitor SVN working copy, validates the native Linux
+Updates the /home/qt/node_monitor SVN working copy, validates the native Linux
 configuration, installs/enables the five monitoring units, restarts them in
 dependency order, and checks their loopback health endpoints.
 
@@ -37,7 +38,7 @@ EOF
 }
 
 revision_of() {
-  svn info "${PROJECT_ROOT}" | awk -F': ' '/^Revision:/ { print $2; exit }'
+  "${SVN_BIN}" info "${PROJECT_ROOT}" | awk -F': ' '/^(Revision|版本):/ { print $2; exit }'
 }
 
 backup_local_config() {
@@ -206,8 +207,13 @@ if [[ ${EUID} -ne 0 ]]; then
   exit 1
 fi
 
+if [[ ! -x "${SVN_BIN}" ]]; then
+  echo "Required SVN client is missing or not executable: ${SVN_BIN}" >&2
+  exit 1
+fi
+
 for command_name in \
-  svn systemctl systemd-analyze curl flock runuser \
+  systemctl systemd-analyze curl flock runuser \
   ssh-agent ssh-add ssh-keygen awk grep sed tr; do
   if ! command -v "${command_name}" >/dev/null 2>&1; then
     echo "Required command is missing: ${command_name}" >&2
@@ -240,7 +246,7 @@ if [[ ${1:-} != "--after-update" ]]; then
   fi
 
   echo "Updating ${PROJECT_ROOT} from SVN revision ${revision_before}"
-  svn_update=(svn update "${PROJECT_ROOT}")
+  svn_update=("${SVN_BIN}" update "${PROJECT_ROOT}")
   if [[ -n ${target_revision} ]]; then
     svn_update+=(-r "${target_revision}")
   fi
@@ -252,7 +258,7 @@ if [[ ${1:-} != "--after-update" ]]; then
       --trust-server-cert
   unset svn_password
 
-  if svn status --xml "${PROJECT_ROOT}" | grep -q 'item="conflicted"'; then
+  if "${SVN_BIN}" status --xml "${PROJECT_ROOT}" | grep -q 'item="conflicted"'; then
     echo "SVN update left conflicts; monitoring services were not restarted" >&2
     echo "Pre-update configuration backup: ${backup_root}" >&2
     exit 1

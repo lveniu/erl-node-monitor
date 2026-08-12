@@ -7,9 +7,9 @@ After=network-online.target erlang-monitor-alertmanager.service erlang-monitor-e
 Type=simple
 User=erlang-monitor
 Group=erlang-monitor
-WorkingDirectory=/data/node_monitor/prometheus
+WorkingDirectory=/home/qt/node_monitor/prometheus
 UMask=0027
-ExecStart=/opt/erlang-monitor/prometheus/prometheus --config.file=/data/node_monitor/prometheus/prometheus.local.yml --storage.tsdb.path=/data/node_monitor/data/prometheus --storage.tsdb.retention.time=30d --web.listen-address=127.0.0.1:20901 --web.enable-lifecycle
+ExecStart=/home/qt/node_monitor/runtime/prometheus/prometheus --config.file=/home/qt/node_monitor/prometheus/prometheus.local.yml --storage.tsdb.path=/home/qt/node_monitor/data/prometheus --storage.tsdb.retention.time=30d --web.listen-address=127.0.0.1:20901 --web.enable-lifecycle
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5s

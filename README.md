@@ -308,6 +308,10 @@ docker compose -f compose.yml -f compose.ops-agent.yml --profile ops-agent up -d
 
 Ops Agent 职责、权限、流程和 Shell 安全边界见 [docs/ops-agent-overview.md](docs/ops-agent-overview.md)。
 
+### 可选：代码解析 MCP 对话
+
+Grafana Editor 可在 `/a/erlang-monitor-controls-app/code-analysis` 使用多轮只读代码分析。页面通过 Grafana 服务端代理依次调用 Code Analysis MCP 的 `list_projects`、`inspect_repository` 和 `analyze_codebase`，只允许选择 MCP 注册表返回的精确项目。多轮前文保存在当前浏览器会话中并限长传入下一轮；每轮仍要求重新核对源码，不把上一轮回答当作已验证事实。接入地址、Token、容器网络和验证边界见 [Grafana 代码解析 MCP 插件](docs/code-analysis-mcp-plugin.md)。
+
 > Exporter 只为每个节点当前"最大内存进程"和"最大消息队列进程"各保留一组 PID/函数标签，旧进程标签在新快照到达时立即删除，标签规模被限制为每节点两组。不会采集角色 ID、地图实例、消息正文、进程 dictionary 或业务状态。
 
 ## 验证与测试

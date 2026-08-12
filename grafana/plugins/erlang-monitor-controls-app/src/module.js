@@ -23,6 +23,8 @@ import {
 } from './control-logic.js';
 import { OverviewPage } from './overview-page.js';
 import { OpsPage } from './ops-page.js';
+import { CodePage } from './code-page.js';
+import { HomePage } from './home-page.js';
 
 const collectProxyURL = '/api/plugin-proxy/erlang-monitor-controls-app/collect';
 const statusProxyURL = '/api/plugin-proxy/erlang-monitor-controls-app/status';
@@ -452,8 +454,11 @@ function RootPage() {
   if (window.location.pathname.endsWith('/ops-agent')) {
     return h(OpsPage);
   }
-  // Unknown and legacy routes fall back to the read-only overview.
-  return h(OverviewPage);
+  if (window.location.pathname.endsWith('/code-analysis')) {
+    return h(CodePage);
+  }
+  // The plugin root and unknown legacy routes land on a context-free app home.
+  return h(HomePage);
 }
 
 export const plugin = new AppPlugin().setRootPage(RootPage);

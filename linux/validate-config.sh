@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=/data/node_monitor
-RUNTIME_ROOT=/opt/erlang-monitor
+PROJECT_ROOT=/home/qt/node_monitor
+RUNTIME_ROOT=${PROJECT_ROOT}/runtime
 EXPORTER=${RUNTIME_ROOT}/bin/erlang-exporter
 OPS_AGENT=${RUNTIME_ROOT}/bin/ops-agent
 

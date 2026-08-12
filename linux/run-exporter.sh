@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT=/data/node_monitor
+PROJECT_ROOT=/home/qt/node_monitor
 SECRET_ROOT=${PROJECT_ROOT}/secrets
 
 export_if_present() {
@@ -17,4 +17,4 @@ export_if_present DINGTALK_SECRET_FILE "${SECRET_ROOT}/dingtalk_secret"
 export_if_present DINGTALK_AT_MOBILES_FILE "${SECRET_ROOT}/dingtalk_at_mobiles"
 export_if_present DINGTALK_AT_USER_IDS_FILE "${SECRET_ROOT}/dingtalk_at_user_ids"
 
-exec /opt/erlang-monitor/bin/erlang-exporter "$@"
+exec "${PROJECT_ROOT}/runtime/bin/erlang-exporter" "$@"

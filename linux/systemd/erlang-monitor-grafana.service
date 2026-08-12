@@ -7,21 +7,21 @@ After=network-online.target erlang-monitor-prometheus.service
 Type=simple
 User=erlang-monitor
 Group=erlang-monitor
-WorkingDirectory=/opt/erlang-monitor/grafana
+WorkingDirectory=/home/qt/node_monitor/runtime/grafana
 UMask=0027
-Environment=ERLANG_MONITOR_DASHBOARDS_PATH=/data/node_monitor/grafana/dashboards
-Environment=ERLANG_MONITOR_INTERNAL_DASHBOARDS_PATH=/data/node_monitor/grafana/dashboards-internal
-Environment=ERLANG_MONITOR_QT05_INTERNAL_DASHBOARDS_PATH=/data/node_monitor/grafana/dashboards-qt05-internal
-Environment=ERLANG_MONITOR_QT07_INTERNAL_DASHBOARDS_PATH=/data/node_monitor/grafana/dashboards-qt07-internal
-Environment=GF_PATHS_DATA=/data/node_monitor/data/grafana
-Environment=GF_PATHS_LOGS=/data/node_monitor/data/logs
-Environment=GF_PATHS_PLUGINS=/data/node_monitor/grafana/plugins
-Environment=GF_PATHS_PROVISIONING=/data/node_monitor/grafana/provisioning-local
+Environment=ERLANG_MONITOR_DASHBOARDS_PATH=/home/qt/node_monitor/grafana/dashboards
+Environment=ERLANG_MONITOR_INTERNAL_DASHBOARDS_PATH=/home/qt/node_monitor/grafana/dashboards-internal
+Environment=ERLANG_MONITOR_QT05_INTERNAL_DASHBOARDS_PATH=/home/qt/node_monitor/grafana/dashboards-qt05-internal
+Environment=ERLANG_MONITOR_QT07_INTERNAL_DASHBOARDS_PATH=/home/qt/node_monitor/grafana/dashboards-qt07-internal
+Environment=GF_PATHS_DATA=/home/qt/node_monitor/data/grafana
+Environment=GF_PATHS_LOGS=/home/qt/node_monitor/data/logs
+Environment=GF_PATHS_PLUGINS=/home/qt/node_monitor/grafana/plugins
+Environment=GF_PATHS_PROVISIONING=/home/qt/node_monitor/grafana/provisioning-local
 Environment=GF_SERVER_DOMAIN=nmonitor-qt01.ftfnc.com
 Environment=GF_SERVER_ROOT_URL=https://nmonitor-qt01.ftfnc.com/
 Environment=GF_SERVER_ENFORCE_DOMAIN=true
-ExecStartPre=/usr/bin/test -s /data/node_monitor/secrets/grafana_admin_password
-ExecStart=/data/node_monitor/linux/run-grafana.sh
+ExecStartPre=/usr/bin/test -s /home/qt/node_monitor/secrets/grafana_admin_password
+ExecStart=/home/qt/node_monitor/linux/run-grafana.sh
 Restart=on-failure
 RestartSec=5s
 NoNewPrivileges=true

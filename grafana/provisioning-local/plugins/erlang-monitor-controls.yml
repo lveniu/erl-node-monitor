@@ -7,5 +7,7 @@ apps:
     jsonData:
       collectorUrl: http://127.0.0.1:20903
       opsAgentUrl: http://127.0.0.1:20906
+      codeMcpUrl: http://127.0.0.1:3100
     secureJsonData:
       opsAgentToolToken: $OPS_AGENT_TOOL_API_TOKEN
+      codeMcpToken: $CODE_MCP_AUTH_TOKEN
